@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { formatEstimateResult } from "@/lib/pricing/format";
 import { ESTIMATE_DISCLAIMER } from "@/lib/estimate-disclaimer";
+import { CopyButton } from "@/components/copy-button";
 import type { PricingResult } from "@/lib/pricing/types";
 
 type Step =
@@ -52,6 +53,7 @@ export function EstimateWizard({
   const [selectedAddOnKeys, setSelectedAddOnKeys] = useState<string[]>([]);
 
   const [estimateId, setEstimateId] = useState<string | null>(null);
+  const [shareToken, setShareToken] = useState<string | null>(null);
   const [pricingResult, setPricingResult] = useState<PricingResult | null>(null);
 
   const selectedVariant = variants.find((v) => v.id === selectedVariantId) ?? null;
@@ -68,6 +70,7 @@ export function EstimateWizard({
           return;
         }
         setEstimateId(result.estimateId);
+        setShareToken(result.shareToken);
         setPricingResult(result.result);
         setStep("estimate");
         return;
@@ -83,6 +86,7 @@ export function EstimateWizard({
           return;
         }
         setEstimateId(result.estimateId);
+        setShareToken(result.shareToken);
         setPricingResult(result.result);
         setStep("estimate");
         return;
@@ -112,6 +116,7 @@ export function EstimateWizard({
         return;
       }
       setEstimateId(result.estimateId);
+      setShareToken(result.shareToken);
       setPricingResult(result.result);
       setStep("estimate");
     });
@@ -198,7 +203,7 @@ export function EstimateWizard({
         <ContactStep pending={pending} error={error} onSubmit={handleLeadSubmit} />
       )}
 
-      {step === "confirmation" && <ConfirmationStep businessName={business.name} />}
+      {step === "confirmation" && <ConfirmationStep businessName={business.name} shareToken={shareToken} />}
     </div>
   );
 }
@@ -415,7 +420,10 @@ function ContactStep({
   );
 }
 
-function ConfirmationStep({ businessName }: { businessName: string }) {
+function ConfirmationStep({ businessName, shareToken }: { businessName: string; shareToken: string | null }) {
+  const shareUrl =
+    shareToken && typeof window !== "undefined" ? `${window.location.origin}/estimate/${shareToken}` : null;
+
   return (
     <Card>
       <CardHeader>
@@ -424,6 +432,12 @@ function ConfirmationStep({ businessName }: { businessName: string }) {
           {businessName} has received your request and will be in touch soon.
         </CardDescription>
       </CardHeader>
+      {shareUrl && (
+        <CardContent className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+          <span>You can view this estimate again anytime.</span>
+          <CopyButton text={shareUrl} label="Copy link" />
+        </CardContent>
+      )}
     </Card>
   );
 }

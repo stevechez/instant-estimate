@@ -63,7 +63,7 @@ export interface SubmitEstimateInput {
 }
 
 export type SubmitEstimateResult =
-  | { status: "ok"; estimateId: string; result: PricingResult }
+  | { status: "ok"; estimateId: string; shareToken: string; result: PricingResult }
   | { status: "error"; message: string };
 
 export async function submitEstimate(input: SubmitEstimateInput): Promise<SubmitEstimateResult> {
@@ -109,14 +109,14 @@ export async function submitEstimate(input: SubmitEstimateInput): Promise<Submit
       ai_classification: { matched_service_key: input.aiMatchedServiceKey },
       urgency: input.answers.urgency ?? null,
     })
-    .select("id")
+    .select("id, share_token")
     .single();
 
   if (error || !inserted) {
     return { status: "error", message: "Something went wrong calculating your estimate. Please try again." };
   }
 
-  return { status: "ok", estimateId: inserted.id, result };
+  return { status: "ok", estimateId: inserted.id, shareToken: inserted.share_token, result };
 }
 
 /**
@@ -143,14 +143,19 @@ export async function submitUnmatchedEstimate(
       refusal_reason: "ai_could_not_classify",
       ai_classification: { matched_service_key: null },
     })
-    .select("id")
+    .select("id, share_token")
     .single();
 
   if (error || !inserted) {
     return { status: "error", message: "Something went wrong. Please try again." };
   }
 
-  return { status: "ok", estimateId: inserted.id, result: { status: "quote_required", reason: "not_configured" } };
+  return {
+    status: "ok",
+    estimateId: inserted.id,
+    shareToken: inserted.share_token,
+    result: { status: "quote_required", reason: "not_configured" },
+  };
 }
 
 export interface SubmitLeadInput {

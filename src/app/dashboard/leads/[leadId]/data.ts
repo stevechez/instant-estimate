@@ -1,13 +1,9 @@
 import "server-only";
 import { getOwnedBusiness, requireUser } from "@/lib/auth/dal";
-
-/** PostgREST embeds a to-one FK relation as either an object or a single-element array depending on how the relationship was inferred — normalize rather than assume. */
-function unwrapOne<T>(value: T | T[] | null | undefined): T | null {
-  if (!value) return null;
-  return Array.isArray(value) ? (value[0] ?? null) : value;
-}
+import { unwrapEmbed } from "@/lib/supabase/unwrap-embed";
 
 interface EmbeddedEstimateRow {
+  share_token: string;
   status: string;
   low_price_cents: number | null;
   high_price_cents: number | null;
@@ -30,6 +26,7 @@ export interface LeadDetail {
   notified_at: string | null;
   created_at: string;
   estimate: {
+    shareToken: string;
     status: string;
     low_price_cents: number | null;
     high_price_cents: number | null;
@@ -51,7 +48,7 @@ export async function loadOwnedLead(leadId: string): Promise<LeadDetail | null> 
   const { data: lead, error } = await supabase
     .from("leads")
     .select(
-      "id, name, phone, email, preferred_contact_method, preferred_service_timing, status, notified_at, created_at, estimates(status, low_price_cents, high_price_cents, fixed_price_cents, urgency, homeowner_description, service_address, breakdown, services(name))"
+      "id, name, phone, email, preferred_contact_method, preferred_service_timing, status, notified_at, created_at, estimates(share_token, status, low_price_cents, high_price_cents, fixed_price_cents, urgency, homeowner_description, service_address, breakdown, services(name))"
     )
     .eq("id", leadId)
     .eq("business_id", business.id)
@@ -59,7 +56,7 @@ export async function loadOwnedLead(leadId: string): Promise<LeadDetail | null> 
 
   if (error || !lead) return null;
 
-  const estimateRow = unwrapOne(lead.estimates as unknown as EmbeddedEstimateRow | EmbeddedEstimateRow[] | null);
+  const estimateRow = unwrapEmbed(lead.estimates as unknown as EmbeddedEstimateRow | EmbeddedEstimateRow[] | null);
 
   return {
     id: lead.id,
@@ -73,6 +70,7 @@ export async function loadOwnedLead(leadId: string): Promise<LeadDetail | null> 
     created_at: lead.created_at,
     estimate: estimateRow
       ? {
+          shareToken: estimateRow.share_token,
           status: estimateRow.status,
           low_price_cents: estimateRow.low_price_cents,
           high_price_cents: estimateRow.high_price_cents,
@@ -81,7 +79,7 @@ export async function loadOwnedLead(leadId: string): Promise<LeadDetail | null> 
           homeowner_description: estimateRow.homeowner_description,
           service_address: estimateRow.service_address,
           breakdown: estimateRow.breakdown,
-          serviceName: unwrapOne(estimateRow.services)?.name ?? null,
+          serviceName: unwrapEmbed(estimateRow.services)?.name ?? null,
         }
       : null,
   };

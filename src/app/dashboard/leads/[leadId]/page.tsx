@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { loadOwnedLead } from "./data";
 import { StatusControl } from "./status-control";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CopyButton } from "@/components/copy-button";
 import { formatMoney } from "@/lib/pricing/format";
 
 function formatEstimateLine(estimate: NonNullable<Awaited<ReturnType<typeof loadOwnedLead>>>["estimate"]): string {
@@ -40,6 +41,21 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ lea
           <StatusControl leadId={lead.id} currentStatus={lead.status} />
         </CardContent>
       </Card>
+
+      {lead.estimate && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Shareable link</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+            <span>Send this to the homeowner to let them view this estimate again.</span>
+            <CopyButton
+              text={`${process.env.APP_URL ?? "http://localhost:3000"}/estimate/${lead.estimate.shareToken}`}
+              label="Copy link"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
