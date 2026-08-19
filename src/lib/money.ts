@@ -13,3 +13,13 @@ export function parseDollarsToCents(input: FormDataEntryValue | null | undefined
 
   return Math.round(dollars * 100);
 }
+
+/**
+ * The inverse of parseDollarsToCents, for pre-filling a form field: null
+ * renders blank, and — critically — 0 renders "0.00", not blank. A naive
+ * `cents ? ... : ""` check would treat a deliberately-saved $0 the same as
+ * "never entered", making the two indistinguishable once redisplayed.
+ */
+export function centsToDollarStringOrBlank(cents: number | null): string {
+  return cents !== null ? (cents / 100).toFixed(2) : "";
+}

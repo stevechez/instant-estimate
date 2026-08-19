@@ -7,12 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { UNIVERSAL_MODIFIERS } from "@/lib/plumbing-services";
+import { centsToDollarStringOrBlank } from "@/lib/money";
 import { formatEstimateResult } from "@/lib/pricing/format";
 import type { VariantWithPricing } from "./data";
-
-function centsToDollarString(cents: number | null): string {
-  return cents && cents > 0 ? (cents / 100).toFixed(2) : "";
-}
 
 export function VariantCard({ variant }: { variant: VariantWithPricing }) {
   const [addOnRows, setAddOnRows] = useState(
@@ -44,7 +41,13 @@ export function VariantCard({ variant }: { variant: VariantWithPricing }) {
                 min="0"
                 step="0.01"
                 placeholder="e.g. 275"
-                defaultValue={centsToDollarString(variant.starting_price_cents)}
+                // starting_price_cents is NOT NULL and uses 0 as the "not
+                // priced yet" sentinel (see the DB schema), unlike
+                // minimum_price_cents below which is genuinely nullable —
+                // so 0 here is converted to null to render as blank too.
+                defaultValue={centsToDollarStringOrBlank(
+                  variant.starting_price_cents > 0 ? variant.starting_price_cents : null
+                )}
               />
               <FieldDescription>
                 Shown as a range (±15%) unless marked flat price below.
@@ -62,7 +65,10 @@ export function VariantCard({ variant }: { variant: VariantWithPricing }) {
                 min="0"
                 step="0.01"
                 placeholder="Optional"
-                defaultValue={centsToDollarString(variant.minimum_price_cents)}
+                // minimum_price_cents is nullable: null means "no minimum",
+                // and an explicit 0 is a real, distinct value that must not
+                // collapse back to blank on redisplay.
+                defaultValue={centsToDollarStringOrBlank(variant.minimum_price_cents)}
               />
             </FieldContent>
           </Field>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDollarsToCents } from "./money";
+import { centsToDollarStringOrBlank, parseDollarsToCents } from "./money";
 
 describe("parseDollarsToCents", () => {
   it("parses plain numbers", () => {
@@ -28,5 +28,23 @@ describe("parseDollarsToCents", () => {
 
   it("returns 0 for an explicit zero, distinct from blank", () => {
     expect(parseDollarsToCents("0")).toBe(0);
+  });
+});
+
+describe("centsToDollarStringOrBlank", () => {
+  it("renders an explicit 0 as \"0.00\", not blank", () => {
+    expect(centsToDollarStringOrBlank(0)).toBe("0.00");
+  });
+
+  it("renders null as blank", () => {
+    expect(centsToDollarStringOrBlank(null)).toBe("");
+  });
+
+  it("renders a positive amount as a fixed-2-decimal dollar string", () => {
+    expect(centsToDollarStringOrBlank(27_550)).toBe("275.50");
+  });
+
+  it("round-trips with parseDollarsToCents for an explicit zero", () => {
+    expect(centsToDollarStringOrBlank(parseDollarsToCents("0"))).toBe("0.00");
   });
 });

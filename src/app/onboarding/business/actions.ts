@@ -28,7 +28,6 @@ export async function createBusiness(
   // Slugs must be unique (supabase/migrations: businesses.slug is unique).
   // Retry with a numeric suffix on collision rather than surfacing a "slug
   // taken" error the contractor never chose or sees.
-  let lastError: string | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
     const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
 
@@ -49,12 +48,15 @@ export async function createBusiness(
       continue;
     }
 
-    lastError = error.message;
+    // Never surface error.message here — it's a raw Postgres error (e.g.
+    // 'duplicate key value violates unique constraint "businesses_owner_id_key"'
+    // from a double-submitted form racing the one-business-per-owner
+    // constraint) and not something a contractor should see.
     break;
   }
 
   return {
     status: "error",
-    message: lastError ?? "Something went wrong creating your business. Try again.",
+    message: "Something went wrong creating your business. Try again.",
   };
 }
