@@ -11,6 +11,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Button render={<Link href="/dashboard/widget" />} variant="ghost" size="sm">
             Get widget code
           </Button>
+          <Button render={<Link href="/dashboard/settings" />} variant="ghost" size="sm">
+            Settings
+          </Button>
           <form action={logout}>
             <Button type="submit" variant="ghost" size="sm">
               Log out

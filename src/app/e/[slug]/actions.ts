@@ -7,6 +7,8 @@ import { calculate } from "@/lib/pricing/engine";
 import { formatMoney } from "@/lib/pricing/format";
 import type { PricingResult } from "@/lib/pricing/types";
 import { sendLeadNotification } from "@/lib/email/send-lead-notification";
+import { sendLeadSms } from "@/lib/sms/send-lead-sms";
+import { normalizePhoneToE164 } from "@/lib/phone";
 import {
   loadActiveServicesForBusiness,
   loadActiveVariantOptions,
@@ -234,27 +236,30 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
     return { status: "error", message: "Something went wrong submitting your request. Please try again." };
   }
 
-  // Best-effort: the lead above is already saved and is the source of
-  // truth. A notification failure must never make the homeowner's
-  // submission look like it failed (PRODUCT_SPEC.md Section 19 requires the
-  // notification, but the lead itself is what actually matters).
-  try {
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("owner_id")
-      .eq("id", input.businessId)
-      .single();
+  // Best-effort, both channels: the lead above is already saved and is the
+  // source of truth. A notification failure — email or SMS — must never
+  // make the homeowner's submission look like it failed (PRODUCT_SPEC.md
+  // Section 19 requires email; SMS is additive, not a replacement, and each
+  // channel is isolated so one failing never blocks the other).
+  const { data: business } = await supabase
+    .from("businesses")
+    .select("owner_id, notification_phone")
+    .eq("id", input.businessId)
+    .maybeSingle();
 
-    if (business) {
+  // services(name) comes back as an object via the FK join; Supabase's
+  // generated types don't know the relationship's cardinality here, hence
+  // the cast rather than a false non-null assumption.
+  const serviceName = (estimate as unknown as { services: { name: string } | null }).services?.name ?? null;
+  const estimateLine = formatStoredEstimateLine(estimate);
+  let notified = false;
+
+  if (business) {
+    try {
       const { data: ownerUser } = await supabase.auth.admin.getUserById(business.owner_id);
       const contractorEmail = ownerUser.user?.email;
 
       if (contractorEmail) {
-        // services(name) comes back as an object via the FK join; Supabase's
-        // generated types don't know the relationship's cardinality here,
-        // hence the cast rather than a false non-null assumption.
-        const serviceName = (estimate as unknown as { services: { name: string } | null }).services?.name ?? null;
-
         await sendLeadNotification({
           contractorEmail,
           leadId: lead.id,
@@ -262,16 +267,38 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
           phone,
           email: input.email?.trim() || null,
           serviceName,
-          estimateLine: formatStoredEstimateLine(estimate),
+          estimateLine,
           urgency: estimate.urgency,
           description: estimate.homeowner_description,
         });
+        notified = true;
+      }
+    } catch (notificationError) {
+      console.error("Failed to send lead notification email:", notificationError);
+    }
 
-        await supabase.from("leads").update({ notified_at: new Date().toISOString() }).eq("id", lead.id);
+    const normalizedPhone = business.notification_phone
+      ? normalizePhoneToE164(business.notification_phone)
+      : null;
+
+    if (normalizedPhone) {
+      try {
+        await sendLeadSms({
+          toPhone: normalizedPhone,
+          leadId: lead.id,
+          homeownerName: name,
+          serviceName,
+          estimateLine,
+        });
+        notified = true;
+      } catch (smsError) {
+        console.error("Failed to send lead notification SMS:", smsError);
       }
     }
-  } catch (notificationError) {
-    console.error("Failed to send lead notification email:", notificationError);
+  }
+
+  if (notified) {
+    await supabase.from("leads").update({ notified_at: new Date().toISOString() }).eq("id", lead.id);
   }
 
   return { status: "ok" };

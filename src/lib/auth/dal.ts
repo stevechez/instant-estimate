@@ -41,6 +41,7 @@ export interface OwnedBusiness {
   brand_color: string | null;
   logo_url: string | null;
   is_active: boolean;
+  notification_phone: string | null;
 }
 
 /** V1 assumes one business per contractor account (PRODUCT_SPEC.md doesn't ask for multi-business support). */
@@ -49,7 +50,7 @@ export async function getOwnedBusiness(ctx?: UserContext): Promise<OwnedBusiness
 
   const { data, error } = await supabase
     .from("businesses")
-    .select("id, name, slug, brand_color, logo_url, is_active")
+    .select("id, name, slug, brand_color, logo_url, is_active, notification_phone")
     .eq("owner_id", user.id)
     .maybeSingle();
 
