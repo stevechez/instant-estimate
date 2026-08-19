@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { loadPublicEstimateEntry } from "./data";
 import { EstimateWizard } from "./estimate-wizard";
 
+const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
+
 export default async function PublicEstimatePage({
   params,
 }: {
@@ -14,8 +16,22 @@ export default async function PublicEstimatePage({
     notFound();
   }
 
+  // Displaying the contractor's brand color is part of "the homeowner
+  // should understand that the estimate experience belongs to the
+  // contractor" (PRODUCT_SPEC.md Section 22) — overriding the --primary
+  // CSS var here (not globally) re-colors buttons/accents to match without
+  // touching any other page. Known limitation: no contrast check against
+  // --primary-foreground, so a very light brand color could read poorly —
+  // acceptable for V1, worth revisiting if it comes up in practice.
+  const brandColor = entry.business.brand_color && HEX_COLOR.test(entry.business.brand_color)
+    ? entry.business.brand_color
+    : null;
+
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-lg flex-col justify-center px-4 py-8">
+    <div
+      className="mx-auto flex min-h-screen w-full max-w-lg flex-col justify-center px-4 py-8"
+      style={brandColor ? ({ "--primary": brandColor } as React.CSSProperties) : undefined}
+    >
       <EstimateWizard business={entry.business} services={entry.services} />
     </div>
   );
