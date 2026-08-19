@@ -4,7 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { classifyServiceFromDescription } from "@/lib/anthropic/classify-service";
 import { buildServiceVariantPricingConfig } from "@/lib/pricing/from-db";
 import { calculate } from "@/lib/pricing/engine";
+import { formatMoney } from "@/lib/pricing/format";
 import type { PricingResult } from "@/lib/pricing/types";
+import { sendLeadNotification } from "@/lib/email/send-lead-notification";
 import {
   loadActiveServicesForBusiness,
   loadActiveVariantOptions,
@@ -164,6 +166,21 @@ export interface SubmitLeadInput {
 
 export type SubmitLeadResult = { status: "ok" } | { status: "error"; message: string };
 
+function formatStoredEstimateLine(estimate: {
+  status: string;
+  low_price_cents: number | null;
+  high_price_cents: number | null;
+  fixed_price_cents: number | null;
+}): string {
+  if (estimate.status === "estimated" && estimate.low_price_cents !== null && estimate.high_price_cents !== null) {
+    return `${formatMoney(estimate.low_price_cents)}–${formatMoney(estimate.high_price_cents)}`;
+  }
+  if (estimate.status === "fixed" && estimate.fixed_price_cents !== null) {
+    return formatMoney(estimate.fixed_price_cents);
+  }
+  return "Quote required";
+}
+
 export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResult> {
   const name = input.name.trim();
   const phone = input.phone.trim();
@@ -175,7 +192,9 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
 
   const { data: estimate } = await supabase
     .from("estimates")
-    .select("id")
+    .select(
+      "id, status, low_price_cents, high_price_cents, fixed_price_cents, urgency, homeowner_description, service_id, services(name)"
+    )
     .eq("id", input.estimateId)
     .eq("business_id", input.businessId)
     .maybeSingle();
@@ -191,23 +210,64 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
       .eq("id", input.estimateId);
   }
 
-  const { error } = await supabase.from("leads").insert({
-    business_id: input.businessId,
-    estimate_id: input.estimateId,
-    name,
-    phone,
-    email: input.email?.trim() || null,
-    preferred_contact_method: input.preferredContactMethod?.trim() || null,
-    preferred_service_timing: input.preferredServiceTiming?.trim() || null,
-    status: "new",
-  });
+  const { data: lead, error } = await supabase
+    .from("leads")
+    .insert({
+      business_id: input.businessId,
+      estimate_id: input.estimateId,
+      name,
+      phone,
+      email: input.email?.trim() || null,
+      preferred_contact_method: input.preferredContactMethod?.trim() || null,
+      preferred_service_timing: input.preferredServiceTiming?.trim() || null,
+      status: "new",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !lead) {
     return { status: "error", message: "Something went wrong submitting your request. Please try again." };
   }
 
-  // Email notification to the contractor (PRODUCT_SPEC.md Section 19) is not
-  // implemented yet — deferred, needs its own email-provider integration.
+  // Best-effort: the lead above is already saved and is the source of
+  // truth. A notification failure must never make the homeowner's
+  // submission look like it failed (PRODUCT_SPEC.md Section 19 requires the
+  // notification, but the lead itself is what actually matters).
+  try {
+    const { data: business } = await supabase
+      .from("businesses")
+      .select("owner_id")
+      .eq("id", input.businessId)
+      .single();
+
+    if (business) {
+      const { data: ownerUser } = await supabase.auth.admin.getUserById(business.owner_id);
+      const contractorEmail = ownerUser.user?.email;
+
+      if (contractorEmail) {
+        // services(name) comes back as an object via the FK join; Supabase's
+        // generated types don't know the relationship's cardinality here,
+        // hence the cast rather than a false non-null assumption.
+        const serviceName = (estimate as unknown as { services: { name: string } | null }).services?.name ?? null;
+
+        await sendLeadNotification({
+          contractorEmail,
+          leadId: lead.id,
+          homeownerName: name,
+          phone,
+          email: input.email?.trim() || null,
+          serviceName,
+          estimateLine: formatStoredEstimateLine(estimate),
+          urgency: estimate.urgency,
+          description: estimate.homeowner_description,
+        });
+
+        await supabase.from("leads").update({ notified_at: new Date().toISOString() }).eq("id", lead.id);
+      }
+    }
+  } catch (notificationError) {
+    console.error("Failed to send lead notification email:", notificationError);
+  }
 
   return { status: "ok" };
 }

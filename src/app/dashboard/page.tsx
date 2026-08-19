@@ -23,14 +23,51 @@ export default async function DashboardPage() {
     throw new Error(`Failed to load services: ${error.message}`);
   }
 
+  const { data: leads, error: leadsError } = await supabase
+    .from("leads")
+    .select("id, name, status, created_at")
+    .eq("business_id", business.id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (leadsError) {
+    throw new Error(`Failed to load leads: ${leadsError.message}`);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="font-heading text-2xl font-medium">{business.name}</h1>
-        <p className="text-sm text-muted-foreground">
-          Leads will show up here once your widget is live.
-        </p>
+        <p className="text-sm text-muted-foreground">Recent leads and service pricing.</p>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent leads</CardTitle>
+          <CardDescription>Homeowner requests from your Instant Estimate widget.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {leads && leads.length > 0 ? (
+            <ul className="flex flex-col gap-1 text-sm">
+              {leads.map((lead) => (
+                <li key={lead.id}>
+                  <Link
+                    href={`/dashboard/leads/${lead.id}`}
+                    className="-mx-2 flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted"
+                  >
+                    <span>{lead.name}</span>
+                    <span className="text-muted-foreground">
+                      {lead.status} · {new Date(lead.created_at).toLocaleDateString()}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">No leads yet.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
