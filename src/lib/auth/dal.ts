@@ -49,3 +49,37 @@ export async function getOwnedBusiness(): Promise<OwnedBusiness | null> {
 
   return data;
 }
+
+export interface OwnedService {
+  id: string;
+  business_id: string;
+  key: string;
+  name: string;
+  is_active: boolean;
+}
+
+/**
+ * A service scoped to the caller's own business, or null if it doesn't
+ * exist or belongs to someone else. RLS already prevents cross-tenant
+ * reads (see supabase/migrations); the explicit business_id match here is
+ * just what makes "not found" and "not yours" collapse into the same,
+ * unambiguous null rather than leaking which case it was.
+ */
+export async function getOwnedService(serviceId: string): Promise<OwnedService | null> {
+  const business = await getOwnedBusiness();
+  if (!business) return null;
+
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase
+    .from("services")
+    .select("id, business_id, key, name, is_active")
+    .eq("id", serviceId)
+    .eq("business_id", business.id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to load service: ${error.message}`);
+  }
+
+  return data;
+}

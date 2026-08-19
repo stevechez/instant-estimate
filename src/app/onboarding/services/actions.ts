@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireUser, getOwnedBusiness } from "@/lib/auth/dal";
-import { PLUMBING_SERVICE_CATALOG } from "@/lib/plumbing-services";
+import { DEFAULT_VARIANTS, PLUMBING_SERVICE_CATALOG } from "@/lib/plumbing-services";
 
 export type ServiceSelectionFormState = { status: "error"; message: string } | undefined;
 
@@ -39,17 +39,40 @@ export async function saveServiceSelection(
   const toRemove = [...existingKeys].filter((key) => !selectedKeys.has(key));
 
   if (toInsert.length > 0) {
-    const { error } = await supabase.from("services").insert(
-      toInsert.map((s, index) => ({
-        business_id: business.id,
-        key: s.key,
-        name: s.name,
-        sort_order: index,
-        is_active: false, // activation happens once pricing is configured — not part of this step
-      }))
-    );
+    const { data: insertedServices, error } = await supabase
+      .from("services")
+      .insert(
+        toInsert.map((s, index) => ({
+          business_id: business.id,
+          key: s.key,
+          name: s.name,
+          sort_order: index,
+          is_active: false, // activation happens once pricing is configured — not part of this step
+        }))
+      )
+      .select("id, key");
     if (error) {
       return { status: "error", message: "Something went wrong saving your services. Try again." };
+    }
+
+    // Every service gets its default variant(s) up front (e.g. Repair /
+    // Replacement) — see DEFAULT_VARIANTS. Contractors price them on the
+    // pricing setup page; they don't author variant structure themselves in V1.
+    const variantRows = (insertedServices ?? []).flatMap((service) =>
+      (DEFAULT_VARIANTS[service.key] ?? []).map((variant, index) => ({
+        service_id: service.id,
+        key: variant.key,
+        name: variant.name,
+        starting_price_cents: 0,
+        sort_order: index,
+        is_active: false,
+      }))
+    );
+    if (variantRows.length > 0) {
+      const { error: variantError } = await supabase.from("service_variants").insert(variantRows);
+      if (variantError) {
+        return { status: "error", message: "Something went wrong saving your services. Try again." };
+      }
     }
   }
 
