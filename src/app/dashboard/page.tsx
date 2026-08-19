@@ -14,7 +14,7 @@ export default async function DashboardPage() {
 
   const { data: services, error } = await supabase
     .from("services")
-    .select("key, name, is_active")
+    .select("id, key, name, is_active")
     .eq("business_id", business.id)
     .order("sort_order");
 
@@ -34,20 +34,22 @@ export default async function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>Your services</CardTitle>
-          <CardDescription>
-            Pricing setup for each service (and activating your widget) isn&apos;t built yet — that&apos;s
-            next.
-          </CardDescription>
+          <CardDescription>Set a price for each service, then activate it to go live.</CardDescription>
         </CardHeader>
         <CardContent>
           {services && services.length > 0 ? (
             <ul className="flex flex-col gap-2 text-sm">
               {services.map((service) => (
-                <li key={service.key} className="flex items-center justify-between">
-                  <span>{service.name}</span>
-                  <span className="text-muted-foreground">
-                    {service.is_active ? "Active" : "Pricing not configured"}
-                  </span>
+                <li key={service.id}>
+                  <Link
+                    href={`/dashboard/services/${service.id}`}
+                    className="flex items-center justify-between rounded-md px-2 py-1.5 -mx-2 hover:bg-muted"
+                  >
+                    <span>{service.name}</span>
+                    <span className="text-muted-foreground">
+                      {service.is_active ? "Active" : "Pricing not configured"}
+                    </span>
+                  </Link>
                 </li>
               ))}
             </ul>
