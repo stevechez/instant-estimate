@@ -1,5 +1,6 @@
 export { calculate } from "./engine";
 export { buildServiceVariantPricingConfig } from "./from-db";
+export { formatMoney, formatEstimateResult } from "./format";
 export type {
   PricingAddOnConfig,
   PricingAnswers,
