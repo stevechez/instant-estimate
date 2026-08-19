@@ -24,6 +24,16 @@ export async function requireUser() {
   return { user, supabase };
 }
 
+/**
+ * The result of requireUser() — pass this through explicitly to
+ * getOwnedBusiness/getOwnedService instead of letting them call
+ * requireUser() again. Each requireUser() call is a real network round-trip
+ * (JWT validation against the auth server); a Server Action that calls
+ * getOwnedService() and then does its own supabase queries was previously
+ * paying for that round-trip 2-3 times over for one request.
+ */
+export type UserContext = Awaited<ReturnType<typeof requireUser>>;
+
 export interface OwnedBusiness {
   id: string;
   name: string;
@@ -34,8 +44,8 @@ export interface OwnedBusiness {
 }
 
 /** V1 assumes one business per contractor account (PRODUCT_SPEC.md doesn't ask for multi-business support). */
-export async function getOwnedBusiness(): Promise<OwnedBusiness | null> {
-  const { user, supabase } = await requireUser();
+export async function getOwnedBusiness(ctx?: UserContext): Promise<OwnedBusiness | null> {
+  const { user, supabase } = ctx ?? (await requireUser());
 
   const { data, error } = await supabase
     .from("businesses")
@@ -65,11 +75,12 @@ export interface OwnedService {
  * just what makes "not found" and "not yours" collapse into the same,
  * unambiguous null rather than leaking which case it was.
  */
-export async function getOwnedService(serviceId: string): Promise<OwnedService | null> {
-  const business = await getOwnedBusiness();
+export async function getOwnedService(serviceId: string, ctx?: UserContext): Promise<OwnedService | null> {
+  const resolvedCtx = ctx ?? (await requireUser());
+  const business = await getOwnedBusiness(resolvedCtx);
   if (!business) return null;
 
-  const { supabase } = await requireUser();
+  const { supabase } = resolvedCtx;
   const { data, error } = await supabase
     .from("services")
     .select("id, business_id, key, name, is_active")

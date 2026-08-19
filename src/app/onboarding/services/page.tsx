@@ -3,8 +3,9 @@ import { getOwnedBusiness, requireUser } from "@/lib/auth/dal";
 import { ServiceSelectionForm } from "./service-selection-form";
 
 export default async function OnboardingServicesPage() {
-  const { supabase } = await requireUser();
-  const business = await getOwnedBusiness();
+  const ctx = await requireUser();
+  const { supabase } = ctx;
+  const business = await getOwnedBusiness(ctx);
 
   if (!business) {
     redirect("/onboarding/business");

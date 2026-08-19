@@ -22,7 +22,14 @@ export function PricingForm({
     <div className="flex flex-col gap-6">
       <form action={action} className="flex flex-col gap-4">
         {variants.map((variant) => (
-          <VariantCard key={variant.id} variant={variant} />
+          // Keyed by updated_at (bumped by the DB on every successful save)
+          // as well as id, so a successful save remounts the card with
+          // fresh server truth instead of keeping stale uncontrolled-input
+          // state (price/minimum/modifiers/add-ons all use defaultValue,
+          // which React only honors on mount). On a failed save updated_at
+          // is unchanged (the RPC rolled back), so the card correctly keeps
+          // showing what the contractor typed rather than wiping it.
+          <VariantCard key={`${variant.id}-${variant.updated_at}`} variant={variant} />
         ))}
 
         <div className="flex items-center gap-3">

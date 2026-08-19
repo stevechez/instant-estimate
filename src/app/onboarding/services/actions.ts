@@ -10,8 +10,9 @@ export async function saveServiceSelection(
   _prevState: ServiceSelectionFormState,
   formData: FormData
 ): Promise<ServiceSelectionFormState> {
-  const { supabase } = await requireUser();
-  const business = await getOwnedBusiness();
+  const ctx = await requireUser();
+  const { supabase } = ctx;
+  const business = await getOwnedBusiness(ctx);
 
   if (!business) {
     redirect("/onboarding/business");
@@ -46,7 +47,10 @@ export async function saveServiceSelection(
           business_id: business.id,
           key: s.key,
           name: s.name,
-          sort_order: index,
+          // Offset by how many services already exist so re-adding a
+          // service after removing others doesn't collide with/interleave
+          // existing sort_order values.
+          sort_order: existingKeys.size + index,
           is_active: false, // activation happens once pricing is configured — not part of this step
         }))
       )

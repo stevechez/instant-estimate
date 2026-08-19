@@ -27,6 +27,8 @@ export interface VariantWithPricing {
   starting_price_cents: number;
   minimum_price_cents: number | null;
   is_active: boolean;
+  /** Bumped by the DB on every successful save (service_variants has an updated_at trigger). Used to key VariantCard so a save remounts it with fresh server truth instead of stale uncontrolled-input state. */
+  updated_at: string;
   modifiers: VariantModifier[];
   add_ons: VariantAddOn[];
   /** Example estimate at $0 modifiers/no add-ons, and again with every universal modifier + add-on applied. Null when unpriced. */
@@ -34,14 +36,15 @@ export interface VariantWithPricing {
 }
 
 export async function loadServicePricingData(serviceId: string) {
-  const service = await getOwnedService(serviceId);
+  const ctx = await requireUser();
+  const service = await getOwnedService(serviceId, ctx);
   if (!service) return null;
 
-  const { supabase } = await requireUser();
+  const { supabase } = ctx;
 
   const { data: variantRows, error: variantsError } = await supabase
     .from("service_variants")
-    .select("id, key, name, pricing_mode, starting_price_cents, minimum_price_cents, is_active")
+    .select("id, key, name, pricing_mode, starting_price_cents, minimum_price_cents, is_active, updated_at")
     .eq("service_id", service.id)
     .order("sort_order");
 

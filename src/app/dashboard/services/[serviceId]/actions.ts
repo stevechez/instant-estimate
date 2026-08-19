@@ -7,17 +7,33 @@ import { UNIVERSAL_MODIFIERS } from "@/lib/plumbing-services";
 
 export type PricingFormState = { status: "error"; message: string } | { status: "saved" } | undefined;
 
+interface VariantPricingPayload {
+  variant_id: string;
+  starting_price_cents: number;
+  minimum_price_cents: number | null;
+  pricing_mode: "ranged" | "fixed";
+  modifiers: {
+    key: string;
+    name: string;
+    amount_cents: number;
+    condition_question_key: string;
+    condition_equals: string;
+  }[];
+  add_ons: { name: string; amount_cents: number }[];
+}
+
 export async function savePricing(
   serviceId: string,
   _prevState: PricingFormState,
   formData: FormData
 ): Promise<PricingFormState> {
-  const service = await getOwnedService(serviceId);
+  const ctx = await requireUser();
+  const service = await getOwnedService(serviceId, ctx);
   if (!service) {
     return { status: "error", message: "Service not found." };
   }
 
-  const { supabase } = await requireUser();
+  const { supabase } = ctx;
 
   const { data: variants, error: variantsError } = await supabase
     .from("service_variants")
@@ -28,43 +44,22 @@ export async function savePricing(
     return { status: "error", message: "Something went wrong. Try again." };
   }
 
-  for (const variant of variants ?? []) {
+  // Build one payload for the whole save; the actual writes happen in a
+  // single save_service_pricing() RPC call so the save is all-or-nothing
+  // (see supabase/migrations/20260819150000_save_service_pricing_rpc.sql —
+  // per-variant REST calls in a loop had no transaction boundary). Add-on
+  // keys are generated inside that function, not here, so it can
+  // de-duplicate names that normalize to the same key before they ever hit
+  // the unique constraint.
+  const payload: VariantPricingPayload[] = (variants ?? []).map((variant) => {
     const priceCents = parseDollarsToCents(formData.get(`price__${variant.key}`));
     const minimumCents = parseDollarsToCents(formData.get(`minimum__${variant.key}`));
     const isFixed = formData.get(`fixed__${variant.key}`) === "on";
 
-    const { error: updateError } = await supabase
-      .from("service_variants")
-      .update({
-        starting_price_cents: priceCents ?? 0,
-        minimum_price_cents: minimumCents,
-        pricing_mode: isFixed ? "fixed" : "ranged",
-        // A variant with no price yet can't be estimated from, so it isn't
-        // eligible to be picked at estimate time even if the service overall
-        // is active (e.g. only "Replacement" is priced so far).
-        is_active: (priceCents ?? 0) > 0,
-      })
-      .eq("id", variant.id);
-
-    if (updateError) {
-      return { status: "error", message: "Something went wrong saving your pricing. Try again." };
-    }
-
-    // Universal modifiers: replace-all is simpler and safer to reason about
-    // here than diffing, and this list is short (3 fixed dimensions).
-    const { error: deleteModifiersError } = await supabase
-      .from("pricing_modifiers")
-      .delete()
-      .eq("service_variant_id", variant.id);
-    if (deleteModifiersError) {
-      return { status: "error", message: "Something went wrong saving your pricing. Try again." };
-    }
-
-    const modifierRows = UNIVERSAL_MODIFIERS.map((def) => {
+    const modifiers = UNIVERSAL_MODIFIERS.map((def) => {
       const amountCents = parseDollarsToCents(formData.get(`mod_${def.key}__${variant.key}`));
       return amountCents && amountCents > 0
         ? {
-            service_variant_id: variant.id,
             key: def.key,
             name: def.label,
             amount_cents: amountCents,
@@ -72,46 +67,36 @@ export async function savePricing(
             condition_equals: def.conditionEquals,
           }
         : null;
-    }).filter((row) => row !== null);
-
-    if (modifierRows.length > 0) {
-      const { error: insertModifiersError } = await supabase.from("pricing_modifiers").insert(modifierRows);
-      if (insertModifiersError) {
-        return { status: "error", message: "Something went wrong saving your pricing. Try again." };
-      }
-    }
-
-    // Add-ons: same replace-all approach.
-    const { error: deleteAddOnsError } = await supabase
-      .from("pricing_add_ons")
-      .delete()
-      .eq("service_variant_id", variant.id);
-    if (deleteAddOnsError) {
-      return { status: "error", message: "Something went wrong saving your pricing. Try again." };
-    }
+    }).filter((modifier) => modifier !== null);
 
     const addOnNames = formData.getAll(`addon_name__${variant.key}`).map(String);
     const addOnPrices = formData.getAll(`addon_price__${variant.key}`).map(String);
-    const addOnRows = addOnNames
+    const addOns = addOnNames
       .map((name, index) => {
         const trimmedName = name.trim();
         const amountCents = parseDollarsToCents(addOnPrices[index]);
         if (!trimmedName || !amountCents || amountCents <= 0) return null;
-        return {
-          service_variant_id: variant.id,
-          key: trimmedName.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || `addon_${index}`,
-          name: trimmedName,
-          amount_cents: amountCents,
-        };
+        return { name: trimmedName, amount_cents: amountCents };
       })
-      .filter((row) => row !== null);
+      .filter((addOn) => addOn !== null);
 
-    if (addOnRows.length > 0) {
-      const { error: insertAddOnsError } = await supabase.from("pricing_add_ons").insert(addOnRows);
-      if (insertAddOnsError) {
-        return { status: "error", message: "Something went wrong saving your pricing. Try again." };
-      }
-    }
+    return {
+      variant_id: variant.id,
+      starting_price_cents: priceCents ?? 0,
+      minimum_price_cents: minimumCents,
+      pricing_mode: isFixed ? ("fixed" as const) : ("ranged" as const),
+      modifiers,
+      add_ons: addOns,
+    };
+  });
+
+  const { error } = await supabase.rpc("save_service_pricing", {
+    p_service_id: service.id,
+    p_variants: payload,
+  });
+
+  if (error) {
+    return { status: "error", message: "Something went wrong saving your pricing. Try again." };
   }
 
   revalidatePath(`/dashboard/services/${serviceId}`);
@@ -124,12 +109,13 @@ export async function activateService(
   serviceId: string,
   _prevState: ActivationFormState
 ): Promise<ActivationFormState> {
-  const service = await getOwnedService(serviceId);
+  const ctx = await requireUser();
+  const service = await getOwnedService(serviceId, ctx);
   if (!service) {
     return { status: "error", message: "Service not found." };
   }
 
-  const { supabase } = await requireUser();
+  const { supabase } = ctx;
 
   const { count, error: countError } = await supabase
     .from("service_variants")
@@ -153,12 +139,22 @@ export async function activateService(
   revalidatePath("/dashboard");
 }
 
-export async function deactivateService(serviceId: string): Promise<void> {
-  const service = await getOwnedService(serviceId);
-  if (!service) return;
+export type DeactivationFormState = { status: "error"; message: string } | undefined;
 
-  const { supabase } = await requireUser();
-  await supabase.from("services").update({ is_active: false }).eq("id", service.id);
+export async function deactivateService(
+  serviceId: string,
+  _prevState: DeactivationFormState
+): Promise<DeactivationFormState> {
+  const ctx = await requireUser();
+  const service = await getOwnedService(serviceId, ctx);
+  if (!service) {
+    return { status: "error", message: "Service not found." };
+  }
+
+  const { error } = await ctx.supabase.from("services").update({ is_active: false }).eq("id", service.id);
+  if (error) {
+    return { status: "error", message: "Something went wrong deactivating this service. Try again." };
+  }
 
   revalidatePath(`/dashboard/services/${serviceId}`);
   revalidatePath("/dashboard");

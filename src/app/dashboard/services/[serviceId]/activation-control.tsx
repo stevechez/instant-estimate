@@ -6,9 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function ActivationControl({ serviceId, isActive }: { serviceId: string; isActive: boolean }) {
-  const boundActivate = activateService.bind(null, serviceId);
-  const [state, action, pending] = useActionState(boundActivate, undefined);
-  const boundDeactivate = deactivateService.bind(null, serviceId);
+  const [activateState, activateAction, activatePending] = useActionState(
+    activateService.bind(null, serviceId),
+    undefined
+  );
+  const [deactivateState, deactivateAction, deactivatePending] = useActionState(
+    deactivateService.bind(null, serviceId),
+    undefined
+  );
 
   return (
     <Card>
@@ -22,18 +27,21 @@ export function ActivationControl({ serviceId, isActive }: { serviceId: string; 
       </CardHeader>
       <CardContent>
         {isActive ? (
-          <form action={boundDeactivate}>
-            <Button type="submit" variant="outline">
-              Deactivate
+          <form action={deactivateAction}>
+            <Button type="submit" variant="outline" disabled={deactivatePending}>
+              {deactivatePending ? "Deactivating…" : "Deactivate"}
             </Button>
+            {deactivateState?.status === "error" && (
+              <p className="mt-2 text-sm text-destructive">{deactivateState.message}</p>
+            )}
           </form>
         ) : (
-          <form action={action}>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Activating…" : "Activate service"}
+          <form action={activateAction}>
+            <Button type="submit" disabled={activatePending}>
+              {activatePending ? "Activating…" : "Activate service"}
             </Button>
-            {state?.status === "error" && (
-              <p className="mt-2 text-sm text-destructive">{state.message}</p>
+            {activateState?.status === "error" && (
+              <p className="mt-2 text-sm text-destructive">{activateState.message}</p>
             )}
           </form>
         )}

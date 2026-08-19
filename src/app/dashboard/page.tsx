@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function DashboardPage() {
-  const { supabase } = await requireUser();
-  const business = await getOwnedBusiness();
+  const ctx = await requireUser();
+  const { supabase } = ctx;
+  const business = await getOwnedBusiness(ctx);
 
   if (!business) {
     redirect("/onboarding/business");
