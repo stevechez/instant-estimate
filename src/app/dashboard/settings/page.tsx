@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getOwnedBusiness, requireUser } from "@/lib/auth/dal";
 import { NotificationPhoneForm } from "./notification-phone-form";
+import { LogoForm } from "./logo-form";
 
 export default async function SettingsPage() {
   await requireUser();
@@ -15,6 +16,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="font-heading text-2xl font-medium">Settings</h1>
       </div>
+      <LogoForm currentLogoUrl={business.logo_url} />
       <NotificationPhoneForm currentPhone={business.notification_phone ?? ""} />
     </div>
   );
