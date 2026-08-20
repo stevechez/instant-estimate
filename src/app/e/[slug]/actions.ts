@@ -9,6 +9,7 @@ import type { PricingResult } from "@/lib/pricing/types";
 import { sendLeadNotification } from "@/lib/email/send-lead-notification";
 import { sendLeadSms } from "@/lib/sms/send-lead-sms";
 import { normalizePhoneToE164 } from "@/lib/phone";
+import { uploadEstimatePhotos } from "@/lib/estimate-photos/upload";
 import {
   loadActiveServicesForBusiness,
   loadActiveVariantOptions,
@@ -169,6 +170,8 @@ export interface SubmitLeadInput {
   serviceAddress?: string;
   preferredContactMethod?: string;
   preferredServiceTiming?: string;
+  /** Up to 3 homeowner-uploaded photos (PRODUCT_SPEC.md Section 10) — best-effort, see uploadEstimatePhotos. */
+  photos?: File[];
 }
 
 export type SubmitLeadResult = { status: "ok" } | { status: "error"; message: string };
@@ -234,6 +237,17 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
 
   if (error || !lead) {
     return { status: "error", message: "Something went wrong submitting your request. Please try again." };
+  }
+
+  // Best-effort, same as the notification channels below: the lead above is
+  // already saved and is the source of truth. Photos are supporting
+  // evidence (PRODUCT_SPEC.md Section 10), not required for a valid lead.
+  if (input.photos && input.photos.length > 0) {
+    try {
+      await uploadEstimatePhotos(supabase, input.estimateId, input.photos);
+    } catch (photoError) {
+      console.error("Failed to upload estimate photos:", photoError);
+    }
   }
 
   // Best-effort, both channels: the lead above is already saved and is the

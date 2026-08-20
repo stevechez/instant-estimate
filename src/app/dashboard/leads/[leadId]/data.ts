@@ -1,6 +1,8 @@
 import "server-only";
 import { getOwnedBusiness, requireUser } from "@/lib/auth/dal";
 import { unwrapEmbed } from "@/lib/supabase/unwrap-embed";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getSignedEstimatePhotoUrls } from "@/lib/estimate-photos/signed-urls";
 
 interface EmbeddedEstimateRow {
   share_token: string;
@@ -13,6 +15,7 @@ interface EmbeddedEstimateRow {
   service_address: string | null;
   breakdown: { key: string; label: string; amountCents: number }[] | null;
   services: { name: string } | { name: string }[] | null;
+  estimate_photos: { storage_path: string }[] | null;
 }
 
 export interface LeadDetail {
@@ -36,6 +39,7 @@ export interface LeadDetail {
     service_address: string | null;
     breakdown: { key: string; label: string; amountCents: number }[] | null;
     serviceName: string | null;
+    photoUrls: string[];
   } | null;
 }
 
@@ -48,7 +52,7 @@ export async function loadOwnedLead(leadId: string): Promise<LeadDetail | null> 
   const { data: lead, error } = await supabase
     .from("leads")
     .select(
-      "id, name, phone, email, preferred_contact_method, preferred_service_timing, status, notified_at, created_at, estimates(share_token, status, low_price_cents, high_price_cents, fixed_price_cents, urgency, homeowner_description, service_address, breakdown, services(name))"
+      "id, name, phone, email, preferred_contact_method, preferred_service_timing, status, notified_at, created_at, estimates(share_token, status, low_price_cents, high_price_cents, fixed_price_cents, urgency, homeowner_description, service_address, breakdown, services(name), estimate_photos(storage_path))"
     )
     .eq("id", leadId)
     .eq("business_id", business.id)
@@ -57,6 +61,16 @@ export async function loadOwnedLead(leadId: string): Promise<LeadDetail | null> 
   if (error || !lead) return null;
 
   const estimateRow = unwrapEmbed(lead.estimates as unknown as EmbeddedEstimateRow | EmbeddedEstimateRow[] | null);
+
+  // Ownership is already established above (RLS-scoped query, joined through
+  // business.id); the admin client here is only to generate signed URLs for
+  // a private bucket, not to re-check authorization.
+  const photoUrls = estimateRow?.estimate_photos?.length
+    ? await getSignedEstimatePhotoUrls(
+        createAdminClient(),
+        estimateRow.estimate_photos.map((p) => p.storage_path)
+      )
+    : [];
 
   return {
     id: lead.id,
@@ -80,6 +94,7 @@ export async function loadOwnedLead(leadId: string): Promise<LeadDetail | null> 
           service_address: estimateRow.service_address,
           breakdown: estimateRow.breakdown,
           serviceName: unwrapEmbed(estimateRow.services)?.name ?? null,
+          photoUrls,
         }
       : null,
   };

@@ -97,6 +97,22 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ lea
           )}
         </CardContent>
       </Card>
+
+      {lead.estimate && lead.estimate.photoUrls.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Photos</CardTitle>
+          </CardHeader>
+          <CardContent className="flex gap-3">
+            {lead.estimate.photoUrls.map((url) => (
+              <a key={url} href={url} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element -- signed Supabase Storage URL, not a local asset */}
+                <img src={url} alt="Homeowner-submitted photo" className="h-24 w-24 rounded-md object-cover" />
+              </a>
+            ))}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -125,6 +125,7 @@ export function EstimateWizard({
   function handleLeadSubmit(formData: FormData) {
     if (!estimateId) return;
     setError(null);
+    const photos = formData.getAll("photos").filter((entry): entry is File => entry instanceof File && entry.size > 0);
     startTransition(async () => {
       const result = await submitLead({
         estimateId,
@@ -135,6 +136,7 @@ export function EstimateWizard({
         serviceAddress: String(formData.get("service_address") ?? ""),
         preferredContactMethod: String(formData.get("preferred_contact_method") ?? ""),
         preferredServiceTiming: String(formData.get("preferred_service_timing") ?? ""),
+        photos,
       });
       if (result.status === "error") {
         setError(result.message);
@@ -378,6 +380,8 @@ function ContactStep({
   error: string | null;
   onSubmit: (formData: FormData) => void;
 }) {
+  const [photoCount, setPhotoCount] = useState(0);
+
   return (
     <Card>
       <CardHeader>
@@ -408,6 +412,24 @@ function ContactStep({
             <FieldContent>
               <FieldLabel htmlFor="service_address">Service address (optional)</FieldLabel>
               <Input id="service_address" name="service_address" />
+            </FieldContent>
+          </Field>
+          <Field>
+            <FieldContent>
+              <FieldLabel htmlFor="photos">Photos (optional)</FieldLabel>
+              <Input
+                id="photos"
+                name="photos"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => setPhotoCount(e.target.files?.length ?? 0)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {photoCount > 3
+                  ? "Only the first 3 photos will be uploaded."
+                  : "A photo can help the contractor understand the problem."}
+              </p>
             </FieldContent>
           </Field>
           {error && <p className="text-sm text-destructive">{error}</p>}
