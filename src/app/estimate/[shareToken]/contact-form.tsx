@@ -61,7 +61,7 @@ export function ContactForm({ estimateId, businessId }: { estimateId: string; bu
         </FieldContent>
       </Field>
       {error && <p className="text-sm text-destructive">{error}</p>}
-      <Button type="submit" disabled={pending}>
+      <Button type="submit" disabled={pending} className="h-12 text-base">
         {pending ? "Sending…" : "Request a quote"}
       </Button>
     </form>

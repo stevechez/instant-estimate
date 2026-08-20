@@ -45,7 +45,7 @@ export default async function ShareableEstimatePage({
       <div className="mb-4 text-center">
         {estimate.business.logoUrl && (
           // eslint-disable-next-line @next/next/no-img-element -- contractor-supplied logo URL, not a local asset
-          <img src={estimate.business.logoUrl} alt={estimate.business.name} className="mx-auto mb-2 h-10" />
+          <img src={estimate.business.logoUrl} alt={estimate.business.name} className="mx-auto mb-2 h-10 max-w-full" />
         )}
         <h1 className="font-heading text-xl font-medium">{estimate.business.name}</h1>
       </div>

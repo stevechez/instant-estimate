@@ -156,7 +156,7 @@ export function EstimateWizard({
       <div className="text-center">
         {business.logo_url && (
           // eslint-disable-next-line @next/next/no-img-element -- contractor-supplied logo URL, not a local asset
-          <img src={business.logo_url} alt={business.name} className="mx-auto mb-2 h-10" />
+          <img src={business.logo_url} alt={business.name} className="mx-auto mb-2 h-10 max-w-full" />
         )}
         <h1 className="font-heading text-xl font-medium">{business.name}</h1>
         <p className="text-sm text-muted-foreground">Instant Estimate</p>
@@ -179,7 +179,11 @@ export function EstimateWizard({
               We can help with: {services.map((s) => s.name).join(", ")}
             </p>
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button onClick={handleDescribeSubmit} disabled={pending || description.trim().length < 3}>
+            <Button
+              onClick={handleDescribeSubmit}
+              disabled={pending || description.trim().length < 3}
+              className="h-12 text-base"
+            >
               {pending ? "Thinking…" : "Get my estimate"}
             </Button>
           </CardContent>
@@ -340,7 +344,7 @@ function QuestionsStep({
         )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button onClick={onSubmit} disabled={pending || !selectedVariant}>
+        <Button onClick={onSubmit} disabled={pending || !selectedVariant} className="h-12 text-base">
           {pending ? "Calculating…" : "See my estimate"}
         </Button>
       </CardContent>
@@ -368,7 +372,7 @@ function EstimateStep({ result, onContinue }: { result: PricingResult; onContinu
             <p className="text-sm text-muted-foreground">{ESTIMATE_DISCLAIMER}</p>
           </>
         )}
-        <Button onClick={onContinue}>
+        <Button onClick={onContinue} className="h-12 text-base">
           {result.status === "quote_required" ? "Request a quote" : "Want the contractor to confirm this estimate?"}
         </Button>
       </CardContent>
@@ -438,7 +442,7 @@ function ContactStep({
             </FieldContent>
           </Field>
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending} className="h-12 text-base">
             {pending ? "Sending…" : "Send my request"}
           </Button>
         </form>
