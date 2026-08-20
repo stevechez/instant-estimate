@@ -63,6 +63,11 @@ export function EstimateWizard({
     startTransition(async () => {
       const classification = await classifyDescription(business.id, description);
 
+      if (classification.status === "rate_limited") {
+        setError(classification.message);
+        return;
+      }
+
       if (classification.status === "unmatched") {
         const result = await submitUnmatchedEstimate(business.id, description);
         if (result.status === "error") {

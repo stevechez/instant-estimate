@@ -10,6 +10,8 @@ import { sendLeadNotification } from "@/lib/email/send-lead-notification";
 import { sendLeadSms } from "@/lib/sms/send-lead-sms";
 import { normalizePhoneToE164 } from "@/lib/phone";
 import { uploadEstimatePhotos } from "@/lib/estimate-photos/upload";
+import { checkRateLimit } from "@/lib/rate-limit/check";
+import { RATE_LIMITS, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit/limits";
 import {
   loadActiveServicesForBusiness,
   loadActiveVariantOptions,
@@ -19,13 +21,19 @@ import {
 
 export type ClassifyResult =
   | { status: "matched"; service: { id: string; key: string; name: string } }
-  | { status: "unmatched" };
+  | { status: "unmatched" }
+  | { status: "rate_limited"; message: string };
 
 /** AI interprets the homeowner's description; it never decides pricing (see classify-service.ts). */
 export async function classifyDescription(businessId: string, description: string): Promise<ClassifyResult> {
   const trimmed = description.trim();
   if (trimmed.length < 3) {
     return { status: "unmatched" };
+  }
+
+  const allowed = await checkRateLimit("classify", RATE_LIMITS.classify.windowSeconds, RATE_LIMITS.classify.limit);
+  if (!allowed) {
+    return { status: "rate_limited", message: RATE_LIMIT_MESSAGE };
   }
 
   const services = await loadActiveServicesForBusiness(businessId);
@@ -70,6 +78,15 @@ export type SubmitEstimateResult =
   | { status: "error"; message: string };
 
 export async function submitEstimate(input: SubmitEstimateInput): Promise<SubmitEstimateResult> {
+  const allowed = await checkRateLimit(
+    "submit-estimate",
+    RATE_LIMITS.submitEstimate.windowSeconds,
+    RATE_LIMITS.submitEstimate.limit
+  );
+  if (!allowed) {
+    return { status: "error", message: RATE_LIMIT_MESSAGE };
+  }
+
   const variant = await loadVariantForEstimate(input.businessId, input.serviceId, input.variantId);
   if (!variant) {
     return { status: "error", message: "That service is no longer available." };
@@ -134,6 +151,15 @@ export async function submitUnmatchedEstimate(
   businessId: string,
   description: string
 ): Promise<SubmitEstimateResult> {
+  const allowed = await checkRateLimit(
+    "submit-estimate",
+    RATE_LIMITS.submitEstimate.windowSeconds,
+    RATE_LIMITS.submitEstimate.limit
+  );
+  if (!allowed) {
+    return { status: "error", message: RATE_LIMIT_MESSAGE };
+  }
+
   const supabase = createAdminClient();
   const { data: inserted, error } = await supabase
     .from("estimates")
@@ -192,6 +218,15 @@ function formatStoredEstimateLine(estimate: {
 }
 
 export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResult> {
+  const allowed = await checkRateLimit(
+    "submit-lead",
+    RATE_LIMITS.submitLead.windowSeconds,
+    RATE_LIMITS.submitLead.limit
+  );
+  if (!allowed) {
+    return { status: "error", message: RATE_LIMIT_MESSAGE };
+  }
+
   const name = input.name.trim();
   const phone = input.phone.trim();
   if (name.length < 1 || phone.length < 7) {
