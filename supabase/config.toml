@@ -223,7 +223,12 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# Kept TRUE locally to match the hosted default. It used to be false, which
+# meant the signup-confirmation flow was never exercised in dev — and it was
+# broken: the default GoTrue email bypassed the app entirely and left new
+# users apparently logged out on the homepage. Turning this off again hides
+# that whole path (see supabase/templates/confirmation.html).
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -253,6 +258,18 @@ otp_expiry = 3600
 # entirely. This one links to our own /auth/confirm route instead, which is
 # what actually establishes the session lib/auth/actions.ts's
 # updatePassword() needs (see app/auth/confirm/route.ts).
+# Custom signup-confirmation template. Same reason as the recovery template
+# below: GoTrue's default confirmation email links to its own
+# /auth/v1/verify endpoint, which verifies the account and then redirects to
+# site_url with the tokens in the URL *fragment*. The server-side session
+# (@supabase/ssr) cannot read a fragment, so the user lands on the homepage
+# appearing logged out and has to go find the login page — on the very first
+# thing they ever do. Routing through our own /auth/confirm exchanges the
+# token server-side and drops them into onboarding already signed in.
+[auth.email.template.confirmation]
+subject = "Confirm your email address"
+content_path = "./supabase/templates/confirmation.html"
+
 [auth.email.template.recovery]
 subject = "Reset your password"
 content_path = "./supabase/templates/recovery.html"

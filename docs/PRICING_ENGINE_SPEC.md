@@ -170,7 +170,19 @@ A service variant may have a contractor-configured **minimum price**. The minimu
 low = max(low, minimum)
 ```
 
-The high bound is never adjusted because of the minimum. If modifiers or add-ons already push the low bound above the minimum, the minimum has no effect. This means the minimum can compress the width of a range (in the case of heavy negative-feeling scenarios it can never occur, since all modifiers in this engine are additive and non-negative — see Section 11) but the range can never invert, and the contractor's stated floor is always honored.
+If modifiers or add-ons already push the low bound above the minimum, the minimum has no effect. Otherwise the minimum compresses the width of the range from below.
+
+The high bound is not adjusted because of the minimum, **except** in the one case where the minimum sits above the high bound entirely:
+
+```text
+high = max(high, low)
+```
+
+Without that clamp the range inverts. The original reasoning here — that inversion is impossible because all modifiers are additive and non-negative — only covered modifiers; it missed the minimum itself, which needs no modifiers to exceed the high bound. A $100 starting price with a $150 minimum yields a base range of $85–$115, floors the low bound to $150, and leaves the high bound at $125: the homeowner is shown "$150–$125". This is ordinary configuration for a contractor who never quotes below their trip charge, not an edge case.
+
+The floor is the contractor's hard requirement, so the low bound stays where the minimum put it and the high bound is carried up to meet it. The resulting range is a single point (`$150–$150`) rather than an invalid one.
+
+**The invariants are therefore: the range never inverts (`high >= low`), and the contractor's stated floor is always honored.**
 
 ---
 

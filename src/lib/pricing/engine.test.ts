@@ -164,6 +164,54 @@ describe("calculate — minimum price (Section 7)", () => {
     expect(result.highCents).toBe(12_500);
   });
 
+  it("never inverts the range when the minimum exceeds the calculated high bound", () => {
+    // Section 7 promises "the range can never invert". Its reasoning only
+    // covers modifiers being additive — it misses the case where the
+    // contractor's floor sits above the whole base range, which needs no
+    // modifiers at all. This is ordinary configuration: a $100 job for a
+    // contractor who never quotes below their $150 trip charge. Before the
+    // fix this returned low 15,000 / high 12,500 and the homeowner was shown
+    // "$150–$125".
+    const variant: ServiceVariantPricingConfig = {
+      pricingMode: "ranged",
+      startingPriceCents: 10_000, // base 8,500 - 11,500
+      minimumPriceCents: 15_000,
+      modifiers: [],
+      addOns: [],
+      quoteOnlyRules: [],
+      requiredAnswerKeys: [],
+    };
+
+    const result = calculate({ variant, answers: {}, selectedAddOnKeys: [] });
+
+    expect(result.status).toBe("estimated");
+    if (result.status !== "estimated") return;
+    expect(result.highCents).toBeGreaterThanOrEqual(result.lowCents);
+    // The floor is still honored exactly: low is the minimum, rounded up.
+    expect(result.lowCents).toBe(15_000);
+    // High is carried up to meet it rather than being left behind.
+    expect(result.highCents).toBe(15_000);
+  });
+
+  it("keeps the range valid when the minimum lands between the base bounds", () => {
+    const variant: ServiceVariantPricingConfig = {
+      pricingMode: "ranged",
+      startingPriceCents: 10_000, // base 8,500 - 11,500
+      minimumPriceCents: 11_000,
+      modifiers: [],
+      addOns: [],
+      quoteOnlyRules: [],
+      requiredAnswerKeys: [],
+    };
+
+    const result = calculate({ variant, answers: {}, selectedAddOnKeys: [] });
+
+    expect(result.status).toBe("estimated");
+    if (result.status !== "estimated") return;
+    expect(result.highCents).toBeGreaterThanOrEqual(result.lowCents);
+    expect(result.lowCents).toBeGreaterThanOrEqual(11_000);
+  });
+
   it("has no effect when the calculated low bound already clears the minimum", () => {
     const variant: ServiceVariantPricingConfig = {
       pricingMode: "ranged",

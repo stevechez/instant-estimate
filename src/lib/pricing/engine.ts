@@ -120,6 +120,21 @@ export function calculate(input: PricingInput): PricingResult {
   lowCents = minimumIsBinding ? roundHighCents(lowCents) : roundLowCents(lowCents);
   highCents = roundHighCents(highCents);
 
+  // Section 7 guarantees the range can never invert, but its reasoning only
+  // considers modifiers (all additive), not the minimum itself. A minimum
+  // set above the entire base range — e.g. a $100 starting price for a
+  // contractor who never quotes below their $150 trip charge — floors the
+  // low bound past the untouched high bound and produced "$150–$125".
+  //
+  // The floor is the contractor's hard requirement, so the low bound stays
+  // where the minimum put it and the high bound is carried up to meet it.
+  // This only ever fires when the minimum is binding above the high bound;
+  // in every other case the high bound is still untouched by the minimum,
+  // exactly as Section 7 describes.
+  if (highCents < lowCents) {
+    highCents = lowCents;
+  }
+
   return {
     status: "estimated",
     lowCents,

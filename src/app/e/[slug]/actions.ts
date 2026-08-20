@@ -12,6 +12,7 @@ import { normalizePhoneToE164 } from "@/lib/phone";
 import { uploadEstimatePhotos } from "@/lib/estimate-photos/upload";
 import { checkRateLimit } from "@/lib/rate-limit/check";
 import { RATE_LIMITS, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit/limits";
+import { sanitizeAddOnKeys, withinLimit } from "@/lib/input-limits";
 import {
   loadActiveServicesForBusiness,
   loadActiveVariantOptions,
@@ -28,6 +29,12 @@ export type ClassifyResult =
 export async function classifyDescription(businessId: string, description: string): Promise<ClassifyResult> {
   const trimmed = description.trim();
   if (trimmed.length < 3) {
+    return { status: "unmatched" };
+  }
+
+  // Bound before the Anthropic call, not after — this is the one public
+  // input with a direct per-request cost attached to its size.
+  if (!withinLimit(trimmed, "description")) {
     return { status: "unmatched" };
   }
 
@@ -87,6 +94,13 @@ export async function submitEstimate(input: SubmitEstimateInput): Promise<Submit
     return { status: "error", message: RATE_LIMIT_MESSAGE };
   }
 
+  if (!withinLimit(input.description, "description")) {
+    return { status: "error", message: "That description is too long. Please shorten it and try again." };
+  }
+  // The engine already ignores unknown add-on keys; this bounds the work it
+  // does looking them up when the caller isn't the real widget.
+  const selectedAddOnKeys = sanitizeAddOnKeys(input.selectedAddOnKeys);
+
   const variant = await loadVariantForEstimate(input.businessId, input.serviceId, input.variantId);
   if (!variant) {
     return { status: "error", message: "That service is no longer available." };
@@ -107,7 +121,7 @@ export async function submitEstimate(input: SubmitEstimateInput): Promise<Submit
   const result = calculate({
     variant: config,
     answers: input.answers,
-    selectedAddOnKeys: input.selectedAddOnKeys,
+    selectedAddOnKeys,
   });
 
   const supabase = createAdminClient();
@@ -119,7 +133,7 @@ export async function submitEstimate(input: SubmitEstimateInput): Promise<Submit
       service_variant_id: input.variantId,
       homeowner_description: input.description,
       answers: input.answers,
-      selected_add_on_keys: input.selectedAddOnKeys,
+      selected_add_on_keys: selectedAddOnKeys,
       status: result.status,
       low_price_cents: result.status === "estimated" ? result.lowCents : null,
       high_price_cents: result.status === "estimated" ? result.highCents : null,
@@ -158,6 +172,10 @@ export async function submitUnmatchedEstimate(
   );
   if (!allowed) {
     return { status: "error", message: RATE_LIMIT_MESSAGE };
+  }
+
+  if (!withinLimit(description, "description")) {
+    return { status: "error", message: "That description is too long. Please shorten it and try again." };
   }
 
   const supabase = createAdminClient();
@@ -233,6 +251,20 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
     return { status: "error", message: "Enter your name and a valid phone number." };
   }
 
+  // Upper bounds too: these actions are reachable by any caller, not just
+  // the widget form, and every one of these lands in an unbounded text
+  // column that a contractor then reads in their dashboard and email.
+  const tooLong =
+    !withinLimit(name, "name") ||
+    !withinLimit(phone, "phone") ||
+    !withinLimit(input.email?.trim(), "email") ||
+    !withinLimit(input.serviceAddress?.trim(), "serviceAddress") ||
+    !withinLimit(input.preferredContactMethod?.trim(), "preferredContactMethod") ||
+    !withinLimit(input.preferredServiceTiming?.trim(), "preferredServiceTiming");
+  if (tooLong) {
+    return { status: "error", message: "One of those fields is too long. Please shorten it and try again." };
+  }
+
   const supabase = createAdminClient();
 
   const { data: estimate } = await supabase
@@ -269,6 +301,15 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
     })
     .select("id")
     .single();
+
+  // 23505 = unique_violation on leads_one_per_estimate_idx: a lead for this
+  // estimate already exists. That's a resubmission (refresh, second tab,
+  // retry after a slow response), not a failure — the homeowner's request
+  // *was* received. Report success and return without notifying again, so
+  // the contractor doesn't get a duplicate email and SMS for one job.
+  if (error?.code === "23505") {
+    return { status: "ok" };
+  }
 
   if (error || !lead) {
     return { status: "error", message: "Something went wrong submitting your request. Please try again." };

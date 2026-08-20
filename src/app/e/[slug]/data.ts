@@ -6,8 +6,17 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * there are no anon RLS policies on any of these tables by design (see
  * supabase/migrations' architecture notes). The homeowner-facing widget is
  * public and unauthenticated, so these functions are the authorization
- * boundary: every query is scoped to is_active = true so nothing
- * half-configured or deactivated is ever reachable from here.
+ * boundary: every services/variants query is scoped to is_active = true so
+ * nothing half-configured or deactivated is ever reachable from here.
+ *
+ * Note on businesses.is_active: that column is NOT consulted here, despite
+ * what its schema comment claims. Nothing in the app ever sets it to true
+ * (it defaults to false), so filtering on it would take every widget
+ * offline. What actually gates a business from serving estimates is having
+ * at least one active service — loadPublicEstimateEntry returns null
+ * otherwise, which covers the half-configured case the column was meant
+ * for. Do not "fix" this by adding the filter without first making
+ * something set the column.
  */
 
 export interface PublicBusiness {

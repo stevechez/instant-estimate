@@ -1,0 +1,14 @@
+-- Correct a misleading comment, not a behaviour change.
+--
+-- The original comment claimed "is_active gates whether the public widget
+-- and shareable links serve anything". It never did: no code path reads it,
+-- and nothing ever sets it to true (it defaults to false), so enforcing it
+-- as documented would take every widget offline. The real gate is whether a
+-- business has at least one active service — see loadPublicEstimateEntry in
+-- src/app/e/[slug]/data.ts.
+--
+-- Left in place rather than dropped because a deliberate "suspend this
+-- contractor" switch is a plausible near-term need (non-payment, abuse) and
+-- the column is where it belongs. Documenting it honestly so nobody wires
+-- up the filter without also wiring up something that sets it.
+comment on column businesses.is_active is 'RESERVED / currently unused. No code reads or writes this. The public widget is gated by having at least one active service, not by this column. Intended for a future explicit suspend switch — if you start filtering on it, make onboarding set it true first or every existing widget goes dark.';
