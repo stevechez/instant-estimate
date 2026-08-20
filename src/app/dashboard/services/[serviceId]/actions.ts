@@ -51,7 +51,21 @@ export async function savePricing(
   // keys are generated inside that function, not here, so it can
   // de-duplicate names that normalize to the same key before they ever hit
   // the unique constraint.
-  const payload: VariantPricingPayload[] = (variants ?? []).map((variant) => {
+  // Only variants the submitted form actually carried. Previously every
+  // variant on the service was included unconditionally, so one missing from
+  // the payload was written as starting_price_cents 0 — which the RPC treats
+  // as "not configured" (deactivating it) and which also wipes its modifiers
+  // and add-ons, since the RPC replaces those wholesale. A truncated or
+  // partial post would therefore silently delete pricing the contractor
+  // never touched. Absent is not the same as blank: a field that is present
+  // but empty still means "clear this price", and is preserved below.
+  const submittedVariants = (variants ?? []).filter((variant) => formData.has(`price__${variant.key}`));
+
+  if (submittedVariants.length === 0) {
+    return { status: "error", message: "Something went wrong saving your pricing. Try again." };
+  }
+
+  const payload: VariantPricingPayload[] = submittedVariants.map((variant) => {
     const priceCents = parseDollarsToCents(formData.get(`price__${variant.key}`));
     const minimumCents = parseDollarsToCents(formData.get(`minimum__${variant.key}`));
     const isFixed = formData.get(`fixed__${variant.key}`) === "on";

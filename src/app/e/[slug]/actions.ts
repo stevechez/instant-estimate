@@ -10,10 +10,11 @@ import { sendLeadNotification } from "@/lib/email/send-lead-notification";
 import { sendLeadSms } from "@/lib/sms/send-lead-sms";
 import { normalizePhoneToE164 } from "@/lib/phone";
 import { uploadEstimatePhotos } from "@/lib/estimate-photos/upload";
-import { checkRateLimit } from "@/lib/rate-limit/check";
+import { checkRateLimit, checkRateLimitForKey } from "@/lib/rate-limit/check";
 import { RATE_LIMITS, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit/limits";
 import { sanitizeAddOnKeys, withinLimit } from "@/lib/input-limits";
 import {
+  isBusinessActive,
   loadActiveServicesForBusiness,
   loadActiveVariantOptions,
   loadVariantForEstimate,
@@ -43,6 +44,8 @@ export async function classifyDescription(businessId: string, description: strin
     return { status: "rate_limited", message: RATE_LIMIT_MESSAGE };
   }
 
+  if (!(await isBusinessActive(businessId))) return { status: "unmatched" };
+
   const services = await loadActiveServicesForBusiness(businessId);
   if (services.length === 0) return { status: "unmatched" };
 
@@ -63,6 +66,8 @@ export async function getVariantOptions(
   businessId: string,
   serviceId: string
 ): Promise<{ variants: VariantForEstimate[] }> {
+  if (!(await isBusinessActive(businessId))) return { variants: [] };
+
   const options = await loadActiveVariantOptions(businessId, serviceId);
   const variants = await Promise.all(
     options.map((v) => loadVariantForEstimate(businessId, serviceId, v.id))
@@ -100,6 +105,10 @@ export async function submitEstimate(input: SubmitEstimateInput): Promise<Submit
   // The engine already ignores unknown add-on keys; this bounds the work it
   // does looking them up when the caller isn't the real widget.
   const selectedAddOnKeys = sanitizeAddOnKeys(input.selectedAddOnKeys);
+
+  if (!(await isBusinessActive(input.businessId))) {
+    return { status: "error", message: "That service is no longer available." };
+  }
 
   const variant = await loadVariantForEstimate(input.businessId, input.serviceId, input.variantId);
   if (!variant) {
@@ -176,6 +185,10 @@ export async function submitUnmatchedEstimate(
 
   if (!withinLimit(description, "description")) {
     return { status: "error", message: "That description is too long. Please shorten it and try again." };
+  }
+
+  if (!(await isBusinessActive(businessId))) {
+    return { status: "error", message: "That service is no longer available." };
   }
 
   const supabase = createAdminClient();
@@ -263,6 +276,22 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
     !withinLimit(input.preferredServiceTiming?.trim(), "preferredServiceTiming");
   if (tooLong) {
     return { status: "error", message: "One of those fields is too long. Please shorten it and try again." };
+  }
+
+  if (!(await isBusinessActive(input.businessId))) {
+    return { status: "error", message: "This business isn't accepting requests right now." };
+  }
+
+  // Second, independent ceiling keyed on the target business rather than the
+  // caller — see RATE_LIMITS.leadsPerBusiness. Protects the contractor from a
+  // distributed flood even where per-IP identity can't be trusted.
+  const businessAllowed = await checkRateLimitForKey(
+    `lead-business:${input.businessId}`,
+    RATE_LIMITS.leadsPerBusiness.windowSeconds,
+    RATE_LIMITS.leadsPerBusiness.limit
+  );
+  if (!businessAllowed) {
+    return { status: "error", message: "This business isn't accepting requests right now." };
   }
 
   const supabase = createAdminClient();

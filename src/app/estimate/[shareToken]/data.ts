@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { unwrapEmbed } from "@/lib/supabase/unwrap-embed";
 
 interface EmbeddedBusinessRow {
+  is_active: boolean;
   name: string;
   brand_color: string | null;
   logo_url: string | null;
@@ -41,7 +42,7 @@ export async function loadShareableEstimate(shareToken: string): Promise<Shareab
   const { data: estimate, error } = await supabase
     .from("estimates")
     .select(
-      "id, business_id, status, low_price_cents, high_price_cents, fixed_price_cents, urgency, homeowner_description, breakdown, businesses(name, brand_color, logo_url, slug), services(name)"
+      "id, business_id, status, low_price_cents, high_price_cents, fixed_price_cents, urgency, homeowner_description, breakdown, businesses(name, brand_color, logo_url, slug, is_active), services(name)"
     )
     .eq("share_token", shareToken)
     .maybeSingle();
@@ -51,7 +52,10 @@ export async function loadShareableEstimate(shareToken: string): Promise<Shareab
   const business = unwrapEmbed(
     estimate.businesses as unknown as EmbeddedBusinessRow | EmbeddedBusinessRow[] | null
   );
-  if (!business) return null;
+  // is_active is the suspend switch (see the column comment): suspending a
+  // business takes its shareable estimate links offline along with its
+  // widget, rather than leaving previously-issued links serving indefinitely.
+  if (!business || !business.is_active) return null;
 
   const { count } = await supabase
     .from("leads")

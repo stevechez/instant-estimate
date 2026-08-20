@@ -36,6 +36,11 @@ export async function createBusiness(
       name,
       slug,
       brand_color: brandColor,
+      // Explicit rather than relying on the column default: is_active is the
+      // suspend switch the public loaders filter on, so a business that
+      // silently defaulted to false would be invisible with no indication
+      // why. See supabase/migrations/20260820160000_activate_businesses.sql.
+      is_active: true,
     });
 
     if (!error) {

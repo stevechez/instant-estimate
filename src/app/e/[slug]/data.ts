@@ -6,17 +6,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * there are no anon RLS policies on any of these tables by design (see
  * supabase/migrations' architecture notes). The homeowner-facing widget is
  * public and unauthenticated, so these functions are the authorization
- * boundary: every services/variants query is scoped to is_active = true so
- * nothing half-configured or deactivated is ever reachable from here.
- *
- * Note on businesses.is_active: that column is NOT consulted here, despite
- * what its schema comment claims. Nothing in the app ever sets it to true
- * (it defaults to false), so filtering on it would take every widget
- * offline. What actually gates a business from serving estimates is having
- * at least one active service — loadPublicEstimateEntry returns null
- * otherwise, which covers the half-configured case the column was meant
- * for. Do not "fix" this by adding the filter without first making
- * something set the column.
+ * boundary: every query is scoped to is_active = true — on the business
+ * (the suspend switch) and on services/variants — so nothing suspended,
+ * half-configured, or deactivated is ever reachable from here.
  */
 
 export interface PublicBusiness {
@@ -48,6 +40,7 @@ export async function loadPublicEstimateEntry(
     .from("businesses")
     .select("id, name, slug, brand_color, logo_url")
     .eq("slug", slug)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (businessError || !business) return null;
@@ -87,6 +80,28 @@ export interface VariantForEstimate {
   minimum_price_cents: number | null;
   modifiers: VariantModifierForEstimate[];
   add_ons: VariantAddOnForEstimate[];
+}
+
+/**
+ * Whether this business is currently allowed to serve anything publicly.
+ *
+ * The page-load check in loadPublicEstimateEntry isn't sufficient on its
+ * own: the widget's server actions all take a businessId from the client,
+ * so a suspended business could still be reached by an already-open tab or
+ * by any caller posting directly to those actions. Every public entry point
+ * re-checks (see app/e/[slug]/actions.ts) rather than trusting that the
+ * page load must have happened first.
+ */
+export async function isBusinessActive(businessId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("businesses")
+    .select("id")
+    .eq("id", businessId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  return data !== null;
 }
 
 /** Active services for a business, keyed by business id rather than slug — used mid-flow once the slug has already been resolved once (e.g. classification). */

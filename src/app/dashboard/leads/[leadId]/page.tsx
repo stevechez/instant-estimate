@@ -57,6 +57,22 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ lea
         </Card>
       )}
 
+      {!lead.notified_at && (
+        // notified_at is only stamped once at least one channel succeeded
+        // (see submitLead). Both failing is silent otherwise: the lead is
+        // saved and safe, but the contractor was never told about it and has
+        // no way to know that from the dashboard.
+        <Card>
+          <CardHeader>
+            <CardTitle>We couldn&apos;t reach you about this lead</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            The notification email or text didn&apos;t go through, so this may be the first you&apos;re seeing of it.
+            The lead itself is saved in full below — check your notification settings if this keeps happening.
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Contact</CardTitle>
