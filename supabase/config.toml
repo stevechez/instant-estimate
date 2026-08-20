@@ -248,6 +248,15 @@ otp_expiry = 3600
 # subject = "You have been invited"
 # content_path = "./supabase/templates/invite.html"
 
+# Custom recovery (password reset) template — the default template links to
+# GoTrue's own /auth/v1/verify redirect endpoint, which bypasses our app
+# entirely. This one links to our own /auth/confirm route instead, which is
+# what actually establishes the session lib/auth/actions.ts's
+# updatePassword() needs (see app/auth/confirm/route.ts).
+[auth.email.template.recovery]
+subject = "Reset your password"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize notification email template
 # [auth.email.notification.password_changed]
 # enabled = true
