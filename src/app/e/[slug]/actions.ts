@@ -7,7 +7,7 @@ import { calculate } from "@/lib/pricing/engine";
 import { formatMoney } from "@/lib/pricing/format";
 import type { PricingResult } from "@/lib/pricing/types";
 import { sendLeadNotification } from "@/lib/email/send-lead-notification";
-import { sendLeadSms } from "@/lib/sms/send-lead-sms";
+import { isTwilioOptOutError, sendLeadSms } from "@/lib/sms/send-lead-sms";
 import { normalizePhoneToE164 } from "@/lib/phone";
 import { uploadEstimatePhotos } from "@/lib/estimate-photos/upload";
 import { checkRateLimit, checkRateLimitForKey } from "@/lib/rate-limit/check";
@@ -411,6 +411,18 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
         });
         notified = true;
       } catch (smsError) {
+        // Twilio blocks messages to a number that replied STOP and rejects
+        // the send with 21610. Record that so the contractor's settings page
+        // can stop implying texts are being delivered. This mirrors Twilio's
+        // state rather than maintaining our own: Twilio is still the
+        // authority on who is subscribed (see the column comment in
+        // supabase/migrations/20260820170000_retention_and_sms_optout.sql).
+        if (isTwilioOptOutError(smsError)) {
+          await supabase
+            .from("businesses")
+            .update({ sms_opted_out_at: new Date().toISOString() })
+            .eq("id", input.businessId);
+        }
         console.error("Failed to send lead notification SMS:", smsError);
       }
     }

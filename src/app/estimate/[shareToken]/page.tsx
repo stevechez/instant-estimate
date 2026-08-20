@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { loadShareableEstimate } from "./data";
 import { ContactForm } from "./contact-form";
+import { LegalLinks } from "@/components/legal-links";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatMoney } from "@/lib/pricing/format";
 import { ESTIMATE_DISCLAIMER } from "@/lib/estimate-disclaimer";
@@ -78,6 +79,7 @@ export default async function ShareableEstimatePage({
           )}
         </CardContent>
       </Card>
+      <LegalLinks privacyOnly className="mt-6 text-center text-xs text-muted-foreground" />
     </div>
   );
 }

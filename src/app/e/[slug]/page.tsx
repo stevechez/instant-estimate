@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { loadPublicEstimateEntry } from "./data";
 import { EstimateWizard } from "./estimate-wizard";
+import { LegalLinks } from "@/components/legal-links";
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
@@ -33,6 +34,15 @@ export default async function PublicEstimatePage({
       style={brandColor ? ({ "--primary": brandColor } as React.CSSProperties) : undefined}
     >
       <EstimateWizard business={entry.business} services={entry.services} />
+      {/*
+        Persistent, reachable from the first screen. The notice at collection
+        in the contact step explains what's gathered and why; this is the
+        "conspicuously posted" policy link CalOPPA expects, and it must not
+        depend on the homeowner reaching the last step to appear.
+        Terms are deliberately NOT linked here — homeowners are not party to
+        them (see docs/legal/README.md).
+      */}
+      <LegalLinks privacyOnly className="mt-6 text-center text-xs text-muted-foreground" />
     </div>
   );
 }

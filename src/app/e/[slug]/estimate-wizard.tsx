@@ -211,7 +211,12 @@ export function EstimateWizard({
       )}
 
       {step === "contact" && (
-        <ContactStep pending={pending} error={error} onSubmit={handleLeadSubmit} />
+        <ContactStep
+          businessName={business.name}
+          pending={pending}
+          error={error}
+          onSubmit={handleLeadSubmit}
+        />
       )}
 
       {step === "confirmation" && <ConfirmationStep businessName={business.name} shareToken={shareToken} />}
@@ -381,10 +386,12 @@ function EstimateStep({ result, onContinue }: { result: PricingResult; onContinu
 }
 
 function ContactStep({
+  businessName,
   pending,
   error,
   onSubmit,
 }: {
+  businessName: string;
   pending: boolean;
   error: string | null;
   onSubmit: (formData: FormData) => void;
@@ -399,6 +406,21 @@ function ContactStep({
       </CardHeader>
       <CardContent>
         <form action={onSubmit} className="flex flex-col gap-4">
+          {/*
+            Notice at collection. Deliberately placed above the fields rather
+            than buried under the submit button, and it does NOT ask the
+            homeowner to accept Instant Estimate's Terms — they are not a
+            party to those (see docs/legal/TERMS.md).
+          */}
+          <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+            {businessName} receives your name, phone number, and anything else you enter here so they can
+            follow up about this job. Instant Estimate provides this form and stores the information for
+            them — we don&apos;t sell it or use it to market to you. See our{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer" className="underline underline-offset-4">
+              Privacy Policy
+            </a>
+            .
+          </p>
           <Field>
             <FieldContent>
               <FieldLabel htmlFor="name">Name</FieldLabel>

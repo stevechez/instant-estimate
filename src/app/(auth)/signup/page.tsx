@@ -58,6 +58,17 @@ export default function SignupPage() {
               </FieldContent>
             </Field>
             {state?.status === "error" && <FieldError>{state.message}</FieldError>}
+            <p className="text-xs text-muted-foreground">
+              By creating an account, you agree to the{" "}
+              <Link href="/terms" className="underline underline-offset-4">
+                Terms of Service
+              </Link>{" "}
+              and acknowledge the{" "}
+              <Link href="/privacy" className="underline underline-offset-4">
+                Privacy Policy
+              </Link>
+              .
+            </p>
             <Button type="submit" disabled={pending} className="w-full">
               {pending ? "Creating account…" : "Create account"}
             </Button>

@@ -1,5 +1,6 @@
 import { logout } from "@/lib/auth/actions";
 import { Button } from "@/components/ui/button";
+import { LegalLinks } from "@/components/legal-links";
 
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,9 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
       <main className="flex flex-1 items-start justify-center px-4 py-12">
         <div className="w-full max-w-lg">{children}</div>
       </main>
+      <footer className="border-t bg-background px-6 py-4">
+        <LegalLinks />
+      </footer>
     </div>
   );
 }

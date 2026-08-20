@@ -13,6 +13,19 @@ export interface SendLeadSmsInput extends LeadSmsContent {
  * configured, so this is safe to call unconditionally once a phone number
  * exists — see the caller in app/e/[slug]/actions.ts.
  */
+/** Twilio's code for "Attempt to send to unsubscribed recipient" — i.e. the recipient replied STOP. */
+export const TWILIO_UNSUBSCRIBED_ERROR_CODE = 21610;
+
+/** True when this error is Twilio telling us the number has opted out, rather than a transient failure. */
+export function isTwilioOptOutError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === TWILIO_UNSUBSCRIBED_ERROR_CODE
+  );
+}
+
 export async function sendLeadSms(input: SendLeadSmsInput): Promise<void> {
   const client = createSmsClient();
 

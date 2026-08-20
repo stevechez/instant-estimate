@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getOwnedBusiness, requireUser } from "@/lib/auth/dal";
 import { NotificationPhoneForm } from "./notification-phone-form";
 import { LogoForm } from "./logo-form";
+import { DeleteAccountForm } from "./delete-account-form";
 
 export default async function SettingsPage() {
   await requireUser();
@@ -17,7 +18,11 @@ export default async function SettingsPage() {
         <h1 className="font-heading text-2xl font-medium">Settings</h1>
       </div>
       <LogoForm currentLogoUrl={business.logo_url} />
-      <NotificationPhoneForm currentPhone={business.notification_phone ?? ""} />
+      <NotificationPhoneForm
+        currentPhone={business.notification_phone ?? ""}
+        optedOutAt={business.sms_opted_out_at}
+      />
+      <DeleteAccountForm businessName={business.name} />
     </div>
   );
 }
