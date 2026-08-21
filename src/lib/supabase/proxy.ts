@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/onboarding"];
-const AUTH_PAGES = ["/login", "/signup"];
+const AUTH_PAGES = ["/", "/login", "/signup"];
 
 /**
  * Refreshes the Supabase session cookie on every request and enforces the
@@ -44,7 +44,11 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix));
-  const isAuthPage = AUTH_PAGES.some((page) => pathname.startsWith(page));
+  // Exact match, not startsWith: "/" would otherwise prefix-match every
+  // route in the app and redirect signed-in users away from everything,
+  // not just the marketing page. /login and /signup have no sub-routes, so
+  // this is equivalent to the old startsWith check for them.
+  const isAuthPage = AUTH_PAGES.some((page) => pathname === page);
 
   if (isProtected && !user) {
     const redirectUrl = new URL("/login", request.url);
