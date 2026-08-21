@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { UNIVERSAL_MODIFIERS } from "@/lib/plumbing-services";
@@ -33,13 +34,9 @@ export function VariantCard({ variant }: { variant: VariantWithPricing }) {
           <Field>
             <FieldContent>
               <FieldLabel htmlFor={`price__${variant.key}`}>Starting price</FieldLabel>
-              <Input
+              <MoneyInput
                 id={`price__${variant.key}`}
                 name={`price__${variant.key}`}
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
                 placeholder="e.g. 275"
                 // starting_price_cents is NOT NULL and uses 0 as the "not
                 // priced yet" sentinel (see the DB schema), unlike
@@ -57,13 +54,9 @@ export function VariantCard({ variant }: { variant: VariantWithPricing }) {
           <Field>
             <FieldContent>
               <FieldLabel htmlFor={`minimum__${variant.key}`}>Minimum price</FieldLabel>
-              <Input
+              <MoneyInput
                 id={`minimum__${variant.key}`}
                 name={`minimum__${variant.key}`}
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.01"
                 placeholder="Optional"
                 // minimum_price_cents is nullable: null means "no minimum",
                 // and an explicit 0 is a real, distinct value that must not
@@ -85,6 +78,10 @@ export function VariantCard({ variant }: { variant: VariantWithPricing }) {
 
         <div>
           <p className="mb-2 text-sm font-medium">Surcharges</p>
+          <p className="mb-2 text-sm text-muted-foreground">
+            A flat dollar amount added to the price when it applies. Leave a field blank if you
+            don&apos;t charge extra for it.
+          </p>
           <div className="grid grid-cols-3 gap-3">
             {UNIVERSAL_MODIFIERS.map((def) => {
               const existing = variant.modifiers.find((m) => m.key === def.key);
@@ -92,13 +89,9 @@ export function VariantCard({ variant }: { variant: VariantWithPricing }) {
                 <Field key={def.key}>
                   <FieldContent>
                     <FieldLabel htmlFor={`mod_${def.key}__${variant.key}`}>{def.label}</FieldLabel>
-                    <Input
+                    <MoneyInput
                       id={`mod_${def.key}__${variant.key}`}
                       name={`mod_${def.key}__${variant.key}`}
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
                       placeholder="Not offered"
                       defaultValue={existing ? (existing.amount_cents / 100).toFixed(2) : ""}
                     />
@@ -120,12 +113,8 @@ export function VariantCard({ variant }: { variant: VariantWithPricing }) {
                   defaultValue={row.name}
                   className="flex-1"
                 />
-                <Input
+                <MoneyInput
                   name={`addon_price__${variant.key}`}
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  step="0.01"
                   placeholder="Price"
                   defaultValue={row.price}
                   className="w-28"
