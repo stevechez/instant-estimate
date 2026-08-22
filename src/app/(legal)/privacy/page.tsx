@@ -251,6 +251,12 @@ export default function PrivacyPage() {
         according to its own retention schedule.
       </p>
       <p>
+        If a homeowner gets a price from an estimate form but never submits their contact information, that
+        calculated estimate — with no name, phone, or email attached to it — is deleted automatically after 30
+        days. Once a homeowner does submit their information, the resulting estimate and lead are kept for as
+        long as the contractor&apos;s account is open, same as everything else in this section.
+      </p>
+      <p>
         Homeowners: your information lives inside the contractor&apos;s account. To have it removed, contact the
         contractor you submitted it to, or email us and we&apos;ll work with them.
       </p>

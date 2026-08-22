@@ -7,4 +7,4 @@ export const LEGAL_OPERATOR = "Steve Maciaszek";
 export const LEGAL_CONTACT_EMAIL = "stevechez@gmail.com";
 export const LEGAL_GOVERNING_STATE = "California";
 /** Bump both of these together whenever either document changes materially. */
-export const LEGAL_EFFECTIVE_DATE = "August 20, 2026";
+export const LEGAL_EFFECTIVE_DATE = "August 22, 2026";

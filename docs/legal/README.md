@@ -22,6 +22,7 @@ the application does, check whether one of these is now untrue. In particular:
 | What's sent to Anthropic (`lib/anthropic/`) | Privacy → "The AI part, specifically" |
 | Who receives SMS (`lib/sms/`) | Privacy → contractor texts; Terms §6; the settings disclosure |
 | Rate-limit storage or retention (`check_rate_limit`) | Privacy → "Technical information" (states 30 days) |
+| Abandoned-estimate retention (`check_rate_limit`) | Privacy → "How long we keep things" (states 30 days for lead-less estimates) |
 | Account deletion (`lib/account/delete-account.ts`) | Privacy → "How long we keep things"; Terms §8 |
 | Adding analytics, tracking, or any cookie | Privacy → "Technical information" (currently states none exist) |
 | Sentry config (`sentry.*.config.ts`) | Privacy → "Error reports" |
