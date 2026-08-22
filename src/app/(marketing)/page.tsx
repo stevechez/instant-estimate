@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CheckIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { HeroWidget } from "./hero-widget";
@@ -118,6 +119,56 @@ export default function MarketingHome() {
           <div className="flex justify-center lg:justify-end">
             <LeadCard />
           </div>
+        </div>
+      </section>
+
+      {/* Pricing — founder offer. Not positioned as a free beta: this is a
+          real, paid product from day one. render={<Link href="/signup" />}
+          is the CTA target for now — there is no checkout to send it to yet
+          (see HANDOFF.md, Billing). */}
+      <section id="pricing" className="mx-auto w-full max-w-xl px-4 pb-20 sm:pb-28">
+        <div className="text-center">
+          <h2 className="font-heading text-3xl font-medium tracking-tight sm:text-4xl">
+            Founder Pricing
+          </h2>
+          <p className="mt-4 text-muted-foreground">
+            Join now as a founding contractor and this price is locked in for as long as
+            you&apos;re a customer — it never goes up.
+          </p>
+        </div>
+
+        <div className="mt-10 rounded-2xl border border-border bg-card p-8 shadow-xl ring-1 ring-foreground/10 sm:p-10">
+          <div className="text-center">
+            <p className="flex items-baseline justify-center gap-1.5">
+              <span className="text-5xl font-medium tracking-tight">$49</span>
+              <span className="text-muted-foreground">/month</span>
+            </p>
+            <p className="mt-2 text-sm font-medium text-primary">
+              Founder Pricing — Locked In For Life
+            </p>
+          </div>
+
+          <ul className="mt-8 flex flex-col gap-3 text-sm">
+            {[
+              "AI-powered instant estimates",
+              "Branded estimator",
+              "Unlimited estimates",
+              "Customer lead capture",
+              "Photo uploads",
+              "Contractor dashboard",
+              "Lead details",
+              "Founder pricing locked in for life",
+            ].map((item) => (
+              <li key={item} className="flex items-center gap-2.5">
+                <CheckIcon className="size-4 shrink-0 text-primary" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+
+          <Button render={<Link href="/signup" />} size="lg" className="mt-8 w-full">
+            Become a Founding Contractor
+          </Button>
         </div>
       </section>
 

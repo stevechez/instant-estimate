@@ -696,13 +696,13 @@ Public estimate interactions must expose only the information necessary to compl
 
 ### Launch Pricing
 
-The initial commercial experiment will use:
+The current founding-contractor offer:
 
-> **$27/month**
+> **$49/month — Founder Pricing, Locked In For Life**
 
 This is a founding/launch price intended to reduce purchasing friction while validating the product.
 
-The $27 price is not considered a permanent pricing commitment.
+Unlike an ordinary introductory rate, this price is a commitment to the contractor: it does not increase for as long as they remain a customer. Any future pricing changes apply only to new contractors who sign up after the change, not to existing founding contractors.
 
 ### MVP Principle
 
