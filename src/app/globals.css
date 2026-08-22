@@ -46,6 +46,24 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Section 4 (mobile demo) phone-screen crossfade — see (marketing)/mobile-demo.tsx. */
+  --animate-phone-cycle: phone-cycle 9s ease-in-out infinite;
+}
+
+@keyframes phone-cycle {
+  0% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  27% {
+    opacity: 1;
+  }
+  33%,
+  100% {
+    opacity: 0;
+  }
 }
 
 :root {
