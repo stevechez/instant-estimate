@@ -13,6 +13,7 @@ import { uploadEstimatePhotos } from "@/lib/estimate-photos/upload";
 import { checkRateLimit, checkRateLimitForKey } from "@/lib/rate-limit/check";
 import { RATE_LIMITS, RATE_LIMIT_MESSAGE } from "@/lib/rate-limit/limits";
 import { sanitizeAddOnKeys, withinLimit } from "@/lib/input-limits";
+import { trackEvent } from "@/lib/events/track";
 import {
   isBusinessActive,
   loadActiveServicesForBusiness,
@@ -39,6 +40,13 @@ export async function classifyDescription(businessId: string, description: strin
     return { status: "unmatched" };
   }
 
+  // Gate 5 instrumentation (HANDOFF.md): fired once per serious attempt
+  // (past the length checks above), not on every keystroke or on a
+  // throwaway <3-char submission. Deliberately before the rate-limit check
+  // — a rate-limited attempt is still a real homeowner trying to start an
+  // estimate, and that's the funnel-entry question this event answers.
+  await trackEvent("estimate_started", businessId, { description_length: trimmed.length });
+
   const allowed = await checkRateLimit("classify", RATE_LIMITS.classify.windowSeconds, RATE_LIMITS.classify.limit);
   if (!allowed) {
     return { status: "rate_limited", message: RATE_LIMIT_MESSAGE };
@@ -54,11 +62,26 @@ export async function classifyDescription(businessId: string, description: strin
     services.map((s) => ({ key: s.key, name: s.name }))
   );
 
-  if (!serviceKey) return { status: "unmatched" };
+  if (!serviceKey) {
+    // Covers both "the model said no confident match" and "the OpenAI call
+    // itself failed" — classifyServiceFromDescription fails closed to the
+    // same null either way (PRODUCT_SPEC.md Section 23), and distinguishing
+    // those two cases here would mean changing its return contract, which
+    // wasn't part of this task. The homeowner's raw description is the
+    // whole point of this event (HANDOFF.md: "what are customers typing
+    // that we don't understand") — captured with no other PII attached,
+    // since an unmatched description is never linked to any contact info.
+    await trackEvent("service_unmatched", businessId, { description: trimmed });
+    return { status: "unmatched" };
+  }
 
   const matched = services.find((s) => s.key === serviceKey);
-  if (!matched) return { status: "unmatched" };
+  if (!matched) {
+    await trackEvent("service_unmatched", businessId, { description: trimmed, invalid_service_key: serviceKey });
+    return { status: "unmatched" };
+  }
 
+  await trackEvent("service_classified", businessId, { service_key: serviceKey });
   return { status: "matched", service: matched };
 }
 
@@ -156,7 +179,18 @@ export async function submitEstimate(input: SubmitEstimateInput): Promise<Submit
     .single();
 
   if (error || !inserted) {
+    await trackEvent("estimate_failed", input.businessId, { stage: "submit_estimate_insert" });
     return { status: "error", message: "Something went wrong calculating your estimate. Please try again." };
+  }
+
+  if (result.status === "quote_required") {
+    await trackEvent("estimate_unmatched", input.businessId, { reason: result.reason, service_id: input.serviceId });
+  } else {
+    await trackEvent("estimate_completed", input.businessId, {
+      service_id: input.serviceId,
+      variant_id: input.variantId,
+      status: result.status,
+    });
   }
 
   return { status: "ok", estimateId: inserted.id, shareToken: inserted.share_token, result };
@@ -207,8 +241,11 @@ export async function submitUnmatchedEstimate(
     .single();
 
   if (error || !inserted) {
+    await trackEvent("estimate_failed", businessId, { stage: "submit_unmatched_estimate_insert" });
     return { status: "error", message: "Something went wrong. Please try again." };
   }
+
+  await trackEvent("estimate_unmatched", businessId, { reason: "ai_could_not_classify" });
 
   return {
     status: "ok",
@@ -337,12 +374,17 @@ export async function submitLead(input: SubmitLeadInput): Promise<SubmitLeadResu
   // *was* received. Report success and return without notifying again, so
   // the contractor doesn't get a duplicate email and SMS for one job.
   if (error?.code === "23505") {
+    // Still a real submission from the homeowner's point of view (see the
+    // comment above) — counts the same as a fresh one for funnel purposes.
+    await trackEvent("lead_submitted", input.businessId, { estimate_id: input.estimateId, resubmission: true });
     return { status: "ok" };
   }
 
   if (error || !lead) {
     return { status: "error", message: "Something went wrong submitting your request. Please try again." };
   }
+
+  await trackEvent("lead_submitted", input.businessId, { estimate_id: input.estimateId });
 
   // Best-effort, same as the notification channels below: the lead above is
   // already saved and is the source of truth. Photos are supporting
