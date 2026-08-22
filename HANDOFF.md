@@ -8,16 +8,19 @@ history, and the local database, not recalled from memory.
 
 - All of today's work is **committed and pushed** to branch `feat/marketing-route-group`.
   **No PR is open yet** — you need to open one against `main` (see "Git state" below).
-- The core product (signup → onboarding → pricing → widget → estimate → lead) is
-  **built and verified end-to-end**, including a real estimate + real uploaded
-  photos + real lead created via the actual pricing engine and OpenAI classifier
-  for the test business below. The **only** unverified piece is clicking through
-  the widget's React UI by hand — see section 5, it's a short gap, not a big one.
-- **Browser automation (Claude-in-Chrome) does not work reliably in this Claude
-  Code session and this was a deliberate, final call, not an unresolved retry
-  loop** — see section 9. Don't burn time re-diagnosing it; verify via direct
-  DB queries / scripts as this whole session ended up doing, or have a human
-  drive the browser.
+- **Gate 2 (the full contractor → customer → lead loop) is now fully proven live
+  in the browser, start to finish, including photo upload** — signup → email
+  confirmation → onboarding → service selection → pricing → activation →
+  `/dashboard/widget` → the public `/e/[slug]` estimator → real OpenAI
+  classification → real computed estimate ($225–$325) → contact form with 2
+  uploaded photos → lead created → visible on the dashboard → full lead detail
+  page with photos rendering. Every step was clicked through by hand and
+  screenshotted, not inferred. See section 5.
+- Browser automation (Claude-in-Chrome) **was flaky earlier in this session and
+  then started working again after the user re-added/reauthorized the
+  extension** — if a future session hits the same "frame showing error page" /
+  "not connected" symptoms described in section 9, that's the first thing to
+  try before assuming it's a code problem.
 - The Anthropic API key ran out of balance mid-session; AI classification now runs
   on OpenAI instead. This is done, committed, and verified against the real API.
 - One real bug was found and fixed along the way (`next.config.ts` was missing
@@ -135,78 +138,81 @@ estimate $ amount inline — not the full table you sketched.
 no business-event tracking exists anywhere in the repo (`estimate_started`,
 `service_unmatched`, etc. — none of it is built).
 
-## 5. In-progress: the live end-to-end walkthrough (pick this up first)
+## 5. Gate 2 — the full loop, now proven live, twice, two different ways
 
-We were proving the actual live product loop, not just reviewing code, using a
-fresh test contractor account. **This is the single most valuable thing to
-resume** — it's very close to done.
+There are **two separate pieces of evidence** this loop works, from two different
+test businesses. Together they're about as thorough a proof as this gate needs
+before beta. No further re-verification of the basic loop should be necessary —
+if you're picking this up next, move on to Gates 3–5 unless something regresses.
 
-**Test account created today** (real Supabase user, real business, in the local
-DB): email `clmvhouse@yahoo.com`, business "clmv site" (`slug: clmv-site`). I do
-not know the password — it was typed directly into the browser and never passed
-through anything I can see.
+### 5a. Full live browser walkthrough (the definitive one)
 
-**Confirmed state as of this handoff** (verified via direct DB query, not
-assumed):
+Once the Claude-in-Chrome extension was reconnected and reauthorized (see
+section 9), the entire loop was clicked through by hand, screenshotted at every
+step, on a fresh account:
 
-| Step | Status | Evidence |
-|---|---|---|
-| Signup | ✅ PASS | `auth.users` row exists |
-| Email confirm + login | ✅ PASS (inferred — reached login-gated pages) | |
-| Onboarding (business) | ✅ PASS | `businesses` row, slug `clmv-site` |
-| Service selection | ✅ PASS | 3 `services` rows: faucet, toilet, water_heater |
-| Pricing | ✅ PASS | faucet/Repair variant priced at $275.00 |
-| Activation | ✅ PASS | faucet `is_active = true`; toilet/water_heater correctly still inactive |
-| Widget page (`/dashboard/widget`) | **not yet confirmed via UI** | (logic unchanged since it was code-reviewed; see below for why this is the one remaining unverified piece) |
-| Estimate submission | ✅ PASS (verified via direct execution of the real code, not the UI — see below) | `estimates` row `a5e69188-f302-43bf-826f-3e53a88d5d35`: classified "faucet", priced by the real engine at $250–$325 from the $275 starting price |
-| Photo upload | ✅ PASS | 3 real PNGs uploaded to the `estimate-photos` bucket, recorded in `estimate_photos` |
-| Lead submission | ✅ PASS | `leads` row `f106fd8b-3902-4e3c-bd1a-9c0a276dfe08` — Jordan Test, linked to the estimate above |
-| Dashboard visibility | ✅ PASS | Ran the exact query `dashboard/page.tsx` uses — the lead shows up |
-| Lead detail page | ✅ PASS | Ran the exact query `dashboard/leads/[leadId]/page.tsx` uses — name, phone, email, preferred contact/timing, estimate range, and description all present and correct |
+- **Business**: "Browser Test Plumbing" (`slug: browser-test-plumbing`), owner
+  `browsertest.instantestimate@example.com` (test account; password only exists
+  in this session's action history, not recorded anywhere — recreate a new test
+  account rather than trying to recover it)
+- Signup → confirmation link pulled from the real Mailpit API (not clicked
+  through the Mailpit UI — `GET http://127.0.0.1:54324/api/v1/messages`) → auto
+  logged in on confirm → `Tell us about your business` → service selection
+  (confirmed the `Checkbox`/`FieldLabel` sibling-pattern fix toggles correctly
+  on the very first click) → pricing ($275 starting price on Repair) → **Save
+  pricing** → **Activate service** → dashboard shows "Active" → `/dashboard/widget`
+  shows both the shareable link and embed snippet → the actual public
+  `/e/browser-test-plumbing` page → typed `faucet is leaking under kitchen sink`
+  → real OpenAI call classified it as Faucet Repair/Replacement → **real
+  computed estimate: $225–$325** → contact form filled in (name, phone, email,
+  address) → **2 real test photos uploaded through the actual file input** →
+  submitted → "You're all set" → back on the dashboard, the lead appears
+  ("Jordan Browser · new") → opened the lead detail page → full contact info,
+  the $225–$325 estimate, the homeowner's description, and **both uploaded
+  photos rendering** were all present and correct.
 
-**How estimate/photos/lead got verified without a working browser**: `src/app/e/[slug]/actions.ts`
-and `src/lib/openai/classify-service.ts` both start with `import "server-only"`,
-which only resolves inside Next's bundler (no such package exists in
-`node_modules` — Next aliases it internally), so they can't be imported directly
-from a standalone script. Instead, a throwaway script called the same OpenAI
-Responses API request those files make, and imported the **real, unguarded**
-pricing code directly (`src/lib/pricing/engine.ts`, `from-db.ts` — neither has a
-`server-only` guard, by design, since the engine needs to be usable outside a
-request context) to compute the actual result, then wrote to `estimates`,
-`estimate_photos`, and `leads` with the exact same shape `submitEstimate()` /
-`uploadEstimatePhotos()` / `submitLead()` use. This proves the pricing engine,
-the OpenAI classifier, and the schema/relationships all work correctly together
-end-to-end. It does **not** prove the widget's React UI (`estimate-wizard.tsx`)
-wires those same calls correctly when a human clicks through it — that specific
-layer is still the one thing unverified live, and it's the shortest possible gap
-to close: it's ~90 lines of already-reviewed client code with no server logic of
-its own, but "reviewed" isn't "verified," so don't skip actually clicking through
-it once a working browser is available.
+Every one of these was an actual click/type/screenshot, not inferred. Confirmed
+in the DB afterward too: `leads` row `cfa6e2a4-f9b4-443c-a2c9-0d5639a9a315`,
+2 rows in `estimate_photos`.
 
-**Test photo files**, if you want to re-run this or test the upload field by
-hand: 3 valid small PNGs are at
+### 5b. Earlier script-based verification (a second, independent business)
+
+Before the browser started cooperating, the same loop's estimate/photo/lead
+segment was proven a different way, against a second test business ("clmv
+site", `slug: clmv-site`, owner `clmvhouse@yahoo.com` — created via the actual
+signup/onboarding UI, password unknown, typed directly by the user): a
+throwaway script called the real OpenAI Responses API (same request shape
+`classify-service.ts` makes) and imported the **real, unguarded** pricing code
+directly (`src/lib/pricing/engine.ts`, `from-db.ts` — neither has a
+`server-only` guard, by design, since the engine needs to work outside a
+request context), then wrote to `estimates`, `estimate_photos`, and `leads`
+with the exact shape `submitEstimate()`/`uploadEstimatePhotos()`/`submitLead()`
+use. Result: `estimates` row `a5e69188-f302-43bf-826f-3e53a88d5d35` (classified
+faucet, priced $250–$325 off the same $275 starting price), 3 uploaded photos,
+`leads` row `f106fd8b-3902-4e3c-bd1a-9c0a276dfe08` — all confirmed visible via
+the exact queries `dashboard/page.tsx` and `dashboard/leads/[leadId]/page.tsx`
+run.
+
+(`src/app/e/[slug]/actions.ts` and `lib/openai/classify-service.ts` both start
+with `import "server-only"`, which only resolves inside Next's bundler — no such
+package exists in `node_modules`, Next aliases it internally — so they can't be
+imported directly from a standalone script. That's why 5b replicated the
+request shape instead of importing those two files directly.)
+
+### Test photo files
+
+If you want to re-test the photo upload field by hand: 3 valid small PNGs were
+generated at
 `/private/tmp/claude-501/-Users-stevechez-Projects-instant-estimate/fd914982-c645-4c2d-8b5b-9929c5583e15/scratchpad/test-photos/`
-(that path is a session-specific scratchpad and may not survive — regenerate with
-the PNG-writer approach in git history / this doc's session log if it's gone;
-any 3 small real image files work fine, the form has no special requirements
-beyond image/* and 8MB).
+(session-specific scratchpad, may not survive — any 3 small real image files
+work fine; the form only requires `image/*` and ≤8MB).
 
 To check DB state directly at any point:
 ```
 docker exec -i supabase_db_home-services-estimator psql -U postgres -d postgres -c "
-select * from estimates where business_id = '6180f2df-9cea-45e5-9619-f2163f5017ad';
+select * from leads order by created_at desc limit 5;
 "
 ```
-
-**Why this stalled**: not a product bug. The Chrome browser-automation tool
-available in this Claude Code session could not reliably reach `localhost:3000`
-(confirmed: the same machine's normal Chrome browser works fine; only the
-automated/extension-driven browser in this particular tool session couldn't
-render the app, despite the dev server answering every request with 200 when
-checked directly). If you're continuing in a fresh Claude Code session, try the
-browser tooling again — it may simply work this time — but don't be surprised if
-it needs the human to drive the browser directly while an assistant verifies via
-server logs/DB, which is the pattern that was working.
 
 ## 6. Files changed this session (all committed, see git log for full detail)
 
@@ -252,10 +258,10 @@ server logs/DB, which is the pattern that was working.
   session's manual testing (`Sarah's Plumbing`, `Sarah M.`, `$150–$250`, `$275`)
   are all fictional/test values, not real product pricing guidance.
 
-## 9. Browser automation status — final call, not an open problem
+## 9. Browser automation status — resolved, but here's the history
 
-The Claude-in-Chrome extension could not reliably drive this app throughout this
-entire session, in two different failure modes:
+The Claude-in-Chrome extension could not reliably drive this app for most of
+this session, in two different failure modes:
 
 1. Early on: it would connect and the dev server would answer with real `200`s
    (confirmed in server logs), but the extension's screenshot/text-extraction
@@ -267,15 +273,19 @@ entire session, in two different failure modes:
    connected`), independent of the dev server or the app.
 
 The user confirmed their **normal Chrome browser on the same machine loads the
-app fine** — this is specific to the automated/extension-driven browser in this
-tool session, not the app, not the network, not Docker/Supabase.
+app fine** throughout — this was specific to the automated/extension-driven
+browser in this tool session, not the app, not the network, not Docker/Supabase.
 
-**Decision made at the end of this session: stop trying to fix this within the
-session and rely on direct verification instead** (server logs, direct DB
-queries via `docker exec ... psql`, and small throwaway Node scripts calling the
-real non-`server-only` production code — see section 5 for the working example).
-This is a legitimate, high-confidence verification method for anything that
-doesn't require exercising `estimate-wizard.tsx`'s own React code — for that one
-piece, you need either a working browser-automation session or a human clicking
-through it. Don't spend time re-diagnosing the extension unless it's actually
-blocking something that can't be verified any other way — most things can.
+**Resolution**: the user removed and re-added the Claude-in-Chrome extension and
+reauthorized it, and it started working normally afterward — full page loads,
+screenshots, form input, and file uploads all worked correctly for the rest of
+the session (see section 5a's full live walkthrough, done entirely through this
+now-working browser tooling). **If a future session hits either failure mode
+above, try that first** — remove/re-add the extension and reauthorize — before
+spending time on `allowedDevOrigins`-style theories or assuming it's a code
+problem. It very well might just be the extension's connection state.
+
+The throwaway-script verification approach (section 5b) remains a legitimate,
+high-confidence fallback for anything that doesn't strictly require exercising
+React UI code, and is worth keeping in mind even with a working browser —
+it's often faster for pure backend/data verification.
