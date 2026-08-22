@@ -4,6 +4,14 @@ import { withSentryConfig } from "@sentry/nextjs";
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
+  // Dev-only: our browser automation tooling reaches this server via
+  // 127.0.0.1 rather than localhost, which Next 16 otherwise rejects as a
+  // cross-origin dev request (blockCrossSiteDEV in
+  // node_modules/next/dist/server/lib/router-utils/block-cross-site-dev.js
+  // matches on hostname only — no port, no protocol — so this must stay a
+  // bare hostname, not "127.0.0.1:3000"). "localhost" itself needs no entry
+  // here; Next allows it by default.
+  allowedDevOrigins: ["127.0.0.1"],
 };
 
 // Only wrap with Sentry's build plugin (uploads source maps on build) once
