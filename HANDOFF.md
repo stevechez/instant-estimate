@@ -13,6 +13,11 @@ history, and the local database, not recalled from memory.
   photos + real lead created via the actual pricing engine and OpenAI classifier
   for the test business below. The **only** unverified piece is clicking through
   the widget's React UI by hand — see section 5, it's a short gap, not a big one.
+- **Browser automation (Claude-in-Chrome) does not work reliably in this Claude
+  Code session and this was a deliberate, final call, not an unresolved retry
+  loop** — see section 9. Don't burn time re-diagnosing it; verify via direct
+  DB queries / scripts as this whole session ended up doing, or have a human
+  drive the browser.
 - The Anthropic API key ran out of balance mid-session; AI classification now runs
   on OpenAI instead. This is done, committed, and verified against the real API.
 - One real bug was found and fixed along the way (`next.config.ts` was missing
@@ -246,3 +251,31 @@ server logs/DB, which is the pattern that was working.
 - Prices and identifiers used in test data throughout the marketing page and this
   session's manual testing (`Sarah's Plumbing`, `Sarah M.`, `$150–$250`, `$275`)
   are all fictional/test values, not real product pricing guidance.
+
+## 9. Browser automation status — final call, not an open problem
+
+The Claude-in-Chrome extension could not reliably drive this app throughout this
+entire session, in two different failure modes:
+
+1. Early on: it would connect and the dev server would answer with real `200`s
+   (confirmed in server logs), but the extension's screenshot/text-extraction
+   would report `Frame with ID 0 is showing error page` — most likely a
+   dev-only asset/HMR origin mismatch (the same class of issue
+   `allowedDevOrigins` was added to fix, possibly recurring under a different
+   origin/timing, never fully root-caused).
+2. Later: the extension stopped connecting at all (`Browser extension is not
+   connected`), independent of the dev server or the app.
+
+The user confirmed their **normal Chrome browser on the same machine loads the
+app fine** — this is specific to the automated/extension-driven browser in this
+tool session, not the app, not the network, not Docker/Supabase.
+
+**Decision made at the end of this session: stop trying to fix this within the
+session and rely on direct verification instead** (server logs, direct DB
+queries via `docker exec ... psql`, and small throwaway Node scripts calling the
+real non-`server-only` production code — see section 5 for the working example).
+This is a legitimate, high-confidence verification method for anything that
+doesn't require exercising `estimate-wizard.tsx`'s own React code — for that one
+piece, you need either a working browser-automation session or a human clicking
+through it. Don't spend time re-diagnosing the extension unless it's actually
+blocking something that can't be verified any other way — most things can.
