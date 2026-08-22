@@ -4,7 +4,7 @@ import { findProductionConfigProblems } from "./config-check";
 const healthy = {
   APP_URL: "https://app.instantestimate.com",
   SMTP_HOST: "smtp.resend.com",
-  ANTHROPIC_API_KEY: "sk-ant-xxx",
+  OPENAI_API_KEY: "sk-test-xxx",
 };
 
 const problemsFor = (env: Record<string, string | undefined>) =>
@@ -32,11 +32,11 @@ describe("findProductionConfigProblems", () => {
     expect(problemsFor({ ...healthy, SMTP_HOST: "127.0.0.1" })).toContain("SMTP_HOST");
   });
 
-  it("catches a missing Anthropic key, which would make every estimate quote-required", () => {
-    expect(problemsFor({ ...healthy, ANTHROPIC_API_KEY: undefined })).toContain("ANTHROPIC_API_KEY");
+  it("catches a missing OpenAI key, which would make every estimate quote-required", () => {
+    expect(problemsFor({ ...healthy, OPENAI_API_KEY: undefined })).toContain("OPENAI_API_KEY");
   });
 
   it("reports every problem at once rather than stopping at the first", () => {
-    expect(problemsFor({})).toEqual(expect.arrayContaining(["APP_URL", "SMTP_HOST", "ANTHROPIC_API_KEY"]));
+    expect(problemsFor({})).toEqual(expect.arrayContaining(["APP_URL", "SMTP_HOST", "OPENAI_API_KEY"]));
   });
 });

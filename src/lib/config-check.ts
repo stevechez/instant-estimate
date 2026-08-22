@@ -59,9 +59,9 @@ export function findProductionConfigProblems(env: Record<string, string | undefi
     });
   }
 
-  if (!env.ANTHROPIC_API_KEY) {
+  if (!env.OPENAI_API_KEY) {
     problems.push({
-      variable: "ANTHROPIC_API_KEY",
+      variable: "OPENAI_API_KEY",
       message: "Not set. Every homeowner description will fail classification and fall through to 'quote required'.",
     });
   }

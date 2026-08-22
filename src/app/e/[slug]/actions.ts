@@ -1,7 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { classifyServiceFromDescription } from "@/lib/anthropic/classify-service";
+import { classifyServiceFromDescription } from "@/lib/openai/classify-service";
 import { buildServiceVariantPricingConfig } from "@/lib/pricing/from-db";
 import { calculate } from "@/lib/pricing/engine";
 import { formatMoney } from "@/lib/pricing/format";
