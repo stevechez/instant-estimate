@@ -134,9 +134,28 @@ already shows active/inactive services with pricing status and the 10 most recen
 leads. Real gap: the leads list only shows name/status/date, not service type or
 estimate $ amount inline — not the full table you sketched.
 
-**Gate 5 (instrumentation)** — genuinely not started. Sentry error capture exists;
-no business-event tracking exists anywhere in the repo (`estimate_started`,
-`service_unmatched`, etc. — none of it is built).
+**Gate 5 (instrumentation)** — ✅ **done.** New `business_events` table +
+`src/lib/events/track.ts` (fire-and-forget, never blocks the caller), wired
+into all 7 named events at their real call sites in
+`src/app/e/[slug]/actions.ts`: `estimate_started`, `service_classified`,
+`service_unmatched`, `estimate_completed`, `estimate_unmatched`,
+`estimate_failed`, `lead_submitted`. `service_unmatched` carries the
+homeowner's raw description — the actual "what don't we understand" data.
+90-day retention, same in-function pattern as the Gate 3 fix, not
+privacy-policy-governed (no more PII than `estimates` already carries).
+Verified live in the browser twice: a matching run produced
+`estimate_started → service_classified → estimate_completed → lead_submitted`
+with real IDs attached; a non-matching run produced `estimate_started →
+service_unmatched (with the exact typed description) → estimate_unmatched`.
+One known, disclosed scope limit: `classifyServiceFromDescription`'s
+contract (explicitly preserved in an earlier task) can't currently
+distinguish "OpenAI failed" from "model said no match" — both count as
+`service_unmatched` today. Separating them would need a small additive
+change to that return type; not done unilaterally, flagged as a follow-up.
+No dashboard UI reads this table yet — it's meant to be queried directly
+with SQL for now (`select event_type, count(*) from business_events group
+by event_type`), matching "a small number of events, not a giant analytics
+system."
 
 ## 5. Gate 2 — the full loop, now proven live, twice, two different ways
 
@@ -239,7 +258,7 @@ select * from leads order by created_at desc limit 5;
   inactive (never priced) — the AI correctly returns unmatched for anything
   classified as those, that's not a classification failure.
 - No leads-list table with service/estimate columns yet (Gate 4 gap, see above).
-- No business-event analytics yet (Gate 5, not started at all).
+- ~~No business-event analytics yet~~ — done, see Gate 5 above. No dashboard UI reads it yet, by design (query directly with SQL for now).
 - ~~No retention/cleanup for abandoned mid-flow `estimates` rows~~ — fixed, see Gate 3 above.
 - `@anthropic-ai/sdk` is still in `package.json`, unused. Fine to remove whenever,
   just wasn't asked for this session.
