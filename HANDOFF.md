@@ -4,6 +4,50 @@ Written at the end of a long working session because Claude access is ending tod
 Everything below is accurate as of this commit — verified against actual code, git
 history, and the local database, not recalled from memory.
 
+## Update — later the same day, for external audit handoff (Gemini/Antigravity)
+
+Everything in this box was re-verified fresh just now, specifically because this
+repo is about to be independently audited by a different agent. The sections below
+(1-9) are the original session write-up and are **not** updated to reflect this —
+read this box first.
+
+- **Current commit: `97fabe1`**, branch `feat/marketing-route-group`, pushed to
+  origin. **No PR is open.** `main` is unchanged at `3bf97df`.
+- A commit hash `b90bb9b` was referenced elsewhere as "the current production
+  checkpoint." **That commit does not exist anywhere in this repository** —
+  checked against every local and remote branch after a fresh `git fetch origin`.
+  Whatever state it refers to isn't in this repo's history; don't assume it's an
+  ancestor or descendant of `97fabe1`.
+- Checks just re-run, all clean: `tsc --noEmit`, `vitest run` (86/86), `next build`.
+- **Not yet reflected in sections 1-9 below:**
+  - Founder Pricing landing section shipped ($49/mo, "Locked In For Life") and
+    `PRODUCT_SPEC.md` Section 26 updated to match (was $27/mo).
+  - **A hosted Supabase project now exists**: `instant-estimate-production`
+    (ref `dmyxeblobdaswfejgvwz`, org `1catalystvirtualassistant@gmail.com's Org`,
+    `us-east-1`, free tier). All 14 local migrations have been applied to it and
+    verified (12 tables, RLS enabled on each, matching local). **An external agent
+    should know this before assuming no hosted project exists or creating a
+    duplicate one.** Its service-role secret has never been retrieved by any
+    agent — Supabase's own tooling doesn't expose it programmatically, by design;
+    get it from the Supabase dashboard directly if you need it.
+  - **No app is deployed anywhere.** No Vercel project, no domain, no production
+    SMTP configured. The hosted Supabase project above is provisioned but nothing
+    in production points at it yet — the app still only runs locally.
+  - **No billing/checkout exists.** A Stripe OAuth connection (the `claude.ai
+    Stripe` MCP connector) was being started to build real checkout against
+    $49/mo Founder Pricing, but authorization was not completed before this
+    session paused. Zero checkout/webhook code has been written.
+  - Remote branch `contractor-onboarding` (`f8e1f13`) is fully merged into both
+    `main` and `feat/marketing-route-group` already — stale, safe to ignore or
+    delete, not a pending line of work.
+
+**Minimum context for an external agent starting a read-only audit, in order:**
+1. `CLAUDE.md` (root) — top of the instruction hierarchy; links to `AGENTS.md` and `docs/PRODUCT_SPEC.md`.
+2. `docs/PRODUCT_SPEC.md` and `docs/PRICING_ENGINE_SPEC.md` — the actual source of truth for product/pricing behavior, per `CLAUDE.md`'s own stated hierarchy (spec outranks an old implementation or an intuitive read of the code).
+3. This file, start to finish — this box, then the original sections 1-9 below.
+4. `docs/DEPLOYMENT.md` — the deployment checklist. Its Section 10 ("Billing") still says $27/month, which is now stale relative to the Section 26 update above; not corrected, since that file was explicitly out of scope for the task that changed the spec.
+5. `docs/legal/README.md` plus the live `/privacy` and `/terms` pages — for anything touching data handling, retention, or payment claims; both pages currently still say "free while in alpha" / "no billing system," which is now inconsistent with the $49/mo Founder Pricing section on the landing page and will need reconciling before real charges start.
+
 ## TL;DR
 
 - All of today's work is **committed and pushed** to branch `feat/marketing-route-group`.
