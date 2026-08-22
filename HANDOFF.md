@@ -115,8 +115,8 @@ verified against the database from a fresh test signup done today. The loop is
 not yet proven complete because the walkthrough stalled at the widget/estimate
 step (test environment issue, not a code issue — see below).
 
-**Gate 3 (beta safety questions)** — 7 of 8 already correct by design, verified
-by reading the actual code (not assumed):
+**Gate 3 (beta safety questions)** — ✅ **closed, 8 of 8.** All correct by
+design or now fixed:
 
 | Question | Behavior |
 |---|---|
@@ -127,7 +127,7 @@ by reading the actual code (not assumed):
 | OpenAI fails | Try/catch → `serviceKey: null`, fully fail-closed — verified live |
 | Customer submits twice | `leads_one_per_estimate_idx` unique constraint; Postgres `23505` returns success without a duplicate notification |
 | Contractor changes price after an estimate | Safe by construction — `estimates` stores its own price snapshot at calculation time |
-| **Customer abandons mid-flow** | **The one real gap.** An `estimates` row is written before contact info is ever collected, so an abandoned session leaves an orphaned row (no PII, but no retention policy covers it either — the one retention migration that exists only covers rate-limit records and SMS opt-out) |
+| Customer abandons mid-flow | **Fixed** (migration `20260822120000_abandoned_estimate_retention.sql`): lead-less `estimates` rows are now deleted after 30 days, via the same in-function-call pattern as the existing rate-limit cleanup (no cron needed). Privacy Policy's "How long we keep things" updated to state this. Verified live: backdated a real orphaned estimate to 31 days old, triggered `check_rate_limit` through an actual browser submission on the public widget, confirmed via DB that only the backdated row was deleted — two recent orphaned estimates, two real leaded estimates, and the brand-new estimate from the test submission itself were all correctly left alone. |
 
 **Gate 4 (contractor experience)** — closer than expected. `dashboard/page.tsx`
 already shows active/inactive services with pricing status and the 10 most recent
@@ -240,7 +240,7 @@ select * from leads order by created_at desc limit 5;
   classified as those, that's not a classification failure.
 - No leads-list table with service/estimate columns yet (Gate 4 gap, see above).
 - No business-event analytics yet (Gate 5, not started at all).
-- No retention/cleanup for abandoned mid-flow `estimates` rows (Gate 3's one gap).
+- ~~No retention/cleanup for abandoned mid-flow `estimates` rows~~ — fixed, see Gate 3 above.
 - `@anthropic-ai/sdk` is still in `package.json`, unused. Fine to remove whenever,
   just wasn't asked for this session.
 
