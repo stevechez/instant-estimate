@@ -109,11 +109,8 @@ refresh the page, not a code change.
 and widget flow haven't needed independent changes; fail-closed behavior is
 verified at every layer (see Gate 3 table below). Nothing to build here.
 
-**Gate 2 (prove contractor → customer → lead loop)** — **this is the unfinished
-piece, see section 5 below.** Every step exists in code and most have been
-verified against the database from a fresh test signup done today. The loop is
-not yet proven complete because the walkthrough stalled at the widget/estimate
-step (test environment issue, not a code issue — see below).
+**Gate 2 (prove contractor → customer → lead loop)** — ✅ **done.** Proven live
+in the browser, start to finish, twice — see section 5.
 
 **Gate 3 (beta safety questions)** — ✅ **closed, 8 of 8.** All correct by
 design or now fixed:
@@ -129,10 +126,17 @@ design or now fixed:
 | Contractor changes price after an estimate | Safe by construction — `estimates` stores its own price snapshot at calculation time |
 | Customer abandons mid-flow | **Fixed** (migration `20260822120000_abandoned_estimate_retention.sql`): lead-less `estimates` rows are now deleted after 30 days, via the same in-function-call pattern as the existing rate-limit cleanup (no cron needed). Privacy Policy's "How long we keep things" updated to state this. Verified live: backdated a real orphaned estimate to 31 days old, triggered `check_rate_limit` through an actual browser submission on the public widget, confirmed via DB that only the backdated row was deleted — two recent orphaned estimates, two real leaded estimates, and the brand-new estimate from the test submission itself were all correctly left alone. |
 
-**Gate 4 (contractor experience)** — closer than expected. `dashboard/page.tsx`
-already shows active/inactive services with pricing status and the 10 most recent
-leads. Real gap: the leads list only shows name/status/date, not service type or
-estimate $ amount inline — not the full table you sketched.
+**Gate 4 (contractor experience)** — ✅ **done.** `dashboard/page.tsx`'s leads
+list now shows service name and the estimate $ line alongside name/status/date
+(same `unwrapEmbed` + nested-select pattern already used by
+`dashboard/leads/[leadId]/data.ts`, no schema changes, no new tables — an
+existing relationship the leads-detail page was already exercising, just not
+this list). Not rebuilt as a literal `<table>` — enriched the existing list
+rows, per "reuse existing data relationships and schema, do not redesign."
+Verified live: submitted a brand-new lead through the actual widget
+("Gate4 Regression," $225–$325, Faucet Repair/Replacement) and confirmed it
+appeared correctly at the top of the dashboard list immediately, with the
+lead detail page unaffected.
 
 **Gate 5 (instrumentation)** — ✅ **done.** New `business_events` table +
 `src/lib/events/track.ts` (fire-and-forget, never blocks the caller), wired
@@ -257,7 +261,7 @@ select * from leads order by created_at desc limit 5;
 - Toilet and Water Heater services on the test business are intentionally
   inactive (never priced) — the AI correctly returns unmatched for anything
   classified as those, that's not a classification failure.
-- No leads-list table with service/estimate columns yet (Gate 4 gap, see above).
+- ~~No leads-list table with service/estimate columns yet~~ — done, see Gate 4 above.
 - ~~No business-event analytics yet~~ — done, see Gate 5 above. No dashboard UI reads it yet, by design (query directly with SQL for now).
 - ~~No retention/cleanup for abandoned mid-flow `estimates` rows~~ — fixed, see Gate 3 above.
 - `@anthropic-ai/sdk` is still in `package.json`, unused. Fine to remove whenever,

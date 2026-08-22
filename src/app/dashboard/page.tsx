@@ -3,6 +3,34 @@ import { redirect } from "next/navigation";
 import { getOwnedBusiness, requireUser } from "@/lib/auth/dal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { unwrapEmbed } from "@/lib/supabase/unwrap-embed";
+import { formatMoney } from "@/lib/pricing/format";
+
+// Same embed shape as dashboard/leads/[leadId]/data.ts's EmbeddedEstimateRow,
+// trimmed to just what this list needs (service name + a price line) rather
+// than importing that route's full detail type.
+interface EmbeddedEstimateRow {
+  status: string;
+  low_price_cents: number | null;
+  high_price_cents: number | null;
+  fixed_price_cents: number | null;
+  services: { name: string } | { name: string }[] | null;
+}
+
+// Same logic as dashboard/leads/[leadId]/page.tsx's formatEstimateLine —
+// duplicated rather than extracted into a shared helper, since that page
+// already has its own richer version and this one only needs to run
+// against the trimmer row shape above; not a Gate 4 concern to unify them.
+function formatEstimateLine(estimate: EmbeddedEstimateRow | null): string {
+  if (!estimate) return "Quote required";
+  if (estimate.status === "estimated" && estimate.low_price_cents !== null && estimate.high_price_cents !== null) {
+    return `${formatMoney(estimate.low_price_cents)}–${formatMoney(estimate.high_price_cents)}`;
+  }
+  if (estimate.status === "fixed" && estimate.fixed_price_cents !== null) {
+    return formatMoney(estimate.fixed_price_cents);
+  }
+  return "Quote required";
+}
 
 export default async function DashboardPage() {
   const ctx = await requireUser();
@@ -25,7 +53,9 @@ export default async function DashboardPage() {
 
   const { data: leads, error: leadsError } = await supabase
     .from("leads")
-    .select("id, name, status, created_at")
+    .select(
+      "id, name, status, created_at, estimates(status, low_price_cents, high_price_cents, fixed_price_cents, services(name))"
+    )
     .eq("business_id", business.id)
     .order("created_at", { ascending: false })
     .limit(10);
@@ -49,19 +79,32 @@ export default async function DashboardPage() {
         <CardContent>
           {leads && leads.length > 0 ? (
             <ul className="flex flex-col gap-1 text-sm">
-              {leads.map((lead) => (
-                <li key={lead.id}>
-                  <Link
-                    href={`/dashboard/leads/${lead.id}`}
-                    className="-mx-2 flex items-center justify-between rounded-md px-2 py-1.5 hover:bg-muted"
-                  >
-                    <span>{lead.name}</span>
-                    <span className="text-muted-foreground">
-                      {lead.status} · {new Date(lead.created_at).toLocaleDateString()}
-                    </span>
-                  </Link>
-                </li>
-              ))}
+              {leads.map((lead) => {
+                const estimateRow = unwrapEmbed(
+                  lead.estimates as unknown as EmbeddedEstimateRow | EmbeddedEstimateRow[] | null
+                );
+                const serviceName = unwrapEmbed(estimateRow?.services ?? null)?.name ?? null;
+
+                return (
+                  <li key={lead.id}>
+                    <Link
+                      href={`/dashboard/leads/${lead.id}`}
+                      className="-mx-2 flex items-center justify-between gap-4 rounded-md px-2 py-1.5 hover:bg-muted"
+                    >
+                      <span className="flex flex-col">
+                        <span>{lead.name}</span>
+                        <span className="text-xs text-muted-foreground">{serviceName ?? "Unspecified service"}</span>
+                      </span>
+                      <span className="flex flex-col items-end text-muted-foreground">
+                        <span>{formatEstimateLine(estimateRow)}</span>
+                        <span className="text-xs">
+                          {lead.status} · {new Date(lead.created_at).toLocaleDateString()}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">No leads yet.</p>
